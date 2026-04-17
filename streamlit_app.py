@@ -82,184 +82,201 @@ init_session_state()
 
 # ==================== 2. 數據下載與處理函數 ====================
 
-def get_investment_data():
-  url = 'https://info.cld.hkjc.com/graphql/base/'
-  headers = {'Content-Type': 'application/json'}
+def _fetch_graphql_data(operation_name, query, variables):
+    url = 'https://info.cld.hkjc.com/graphql/base/'
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Referer': 'https://bet.hkjc.com/',
+        'Origin': 'https://bet.hkjc.com',
+        'Accept': '*/*',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+    }
+    
+    payload = {
+        "operationName": operation_name,
+        "variables": variables,
+        "query": query
+    }
+    
+    # 使用 Session 保持連線
+    session = requests.Session()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = session.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 403:
+                # 處理可能的被封鎖情況，稍微等待
+                time.sleep(1)
+            else:
+                st.warning(f"API 請求失敗 (嘗試 {attempt+1}/{max_retries}): {response.status_code}")
+        except Exception as e:
+            st.error(f"連線異常: {str(e)}")
+        time.sleep(0.5)
+    return None
 
-  payload_investment = {
-      "operationName": "racing",
-      "variables": {
-          "date": str(Date),
-          "venueCode": place,
-          "raceNo": int(race_no),
-          "oddsTypes": methodlist
-      },
-      "query": """
-      query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
-        raceMeetings(date: $date, venueCode: $venueCode) {
-          totalInvestment
-          poolInvs: pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
-            id
-            leg {
-              number
-              races
-            }
-            status
-            sellStatus
-            oddsType
-            investment
-            mergedPoolId
-            lastUpdateTime
+def get_investment_data():
+    # 這裡假設 Date, place, race_no, methodlist 已在外部定義 (原程式碼結構)
+    # 若是在 Streamlit 內執行，會讀取到全域變數
+    variables = {
+        "date": str(Date),
+        "venueCode": place,
+        "raceNo": int(race_no),
+        "oddsTypes": methodlist
+    }
+    
+    query = """
+    query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+      raceMeetings(date: $date, venueCode: $venueCode) {
+        totalInvestment
+        poolInvs: pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
+          id
+          leg {
+            number
+            races
           }
+          status
+          sellStatus
+          oddsType
+          investment
+          mergedPoolId
+          lastUpdateTime
         }
       }
-      """
-  }
-
-  response = requests.post(url, headers=headers, json=payload_investment)
-
-  if response.status_code == 200:
-      investment_data = response.json()
-
-      # Extracting the investment into different types of oddsType
-      investments = {
-          "WIN": [],
-          "PLA": [],
-          "QIN": [],
-          "QPL": [],
-          "FCT": [],
-          "TRI": [],
-          "FF": []
-      }
-
-      race_meetings = investment_data.get('data', {}).get('raceMeetings', [])
-      if race_meetings:
-          for meeting in race_meetings:
-              pool_invs = meeting.get('poolInvs', [])
-              for pool in pool_invs:
-                  if place not in ['ST','HV']:
-                    id = pool.get('id')
-                    if id[8:10] != place:
-                      continue                
-                  investment = float(pool.get('investment'))
-                  investments[pool.get('oddsType')].append(investment)
-
-          #print("Investments:", investments)
-      else:
-          st.write("No race meetings found in the response.")
-
-      return investments
-  else:
-      st.error(f"Error: {response.status_code}")
+    }
+    """
+    
+    data = _fetch_graphql_data("racing", query, variables)
+    
+    investments = {
+        "WIN": [], "PLA": [], "QIN": [], "QPL": [],
+        "FCT": [], "TRI": [], "FF": []
+    }
+    
+    if data and 'data' in data:
+        race_meetings = data['data'].get('raceMeetings', [])
+        if race_meetings:
+            for meeting in race_meetings:
+                pool_invs = meeting.get('poolInvs', [])
+                for pool in pool_invs:
+                    # 原有的場地過濾邏輯
+                    if place not in ['ST','HV']:
+                        pool_id = pool.get('id')
+                        if pool_id and pool_id[8:10] != place:
+                            continue                
+                    
+                    inv_val = pool.get('investment')
+                    if inv_val is not None:
+                        try:
+                            investments[pool.get('oddsType')].append(float(inv_val))
+                        except (ValueError, TypeError):
+                            pass
+        else:
+            # 靜默失敗或記錄日誌，不中斷 Streamlit 介面
+            pass
+            
+    return investments
 
 def get_odds_data():
-  url = 'https://info.cld.hkjc.com/graphql/base/'
-  headers = {'Content-Type': 'application/json'}
-  payload_odds = {
-      "operationName": "racing",
-      "variables": {
-          "date": str(Date),
-          "venueCode": place,
-          "raceNo": int(race_no),
-          "oddsTypes": methodlist
-      },
-      "query": """
-      query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
-        raceMeetings(date: $date, venueCode: $venueCode) {
-          pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
-            id
-            status
-            sellStatus
-            oddsType
-            lastUpdateTime
-            guarantee
-            minTicketCost
-            name_en
+    variables = {
+        "date": str(Date),
+        "venueCode": place,
+        "raceNo": int(race_no),
+        "oddsTypes": methodlist
+    }
+    
+    query = """
+    query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+      raceMeetings(date: $date, venueCode: $venueCode) {
+        pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
+          id
+          status
+          sellStatus
+          oddsType
+          lastUpdateTime
+          guarantee
+          minTicketCost
+          name_en
+          name_ch
+          leg {
+            number
+            races
+          }
+          cWinSelections {
+            composite
             name_ch
-            leg {
-              number
-              races
-            }
-            cWinSelections {
-              composite
-              name_ch
-              name_en
-              starters
-            }
-            oddsNodes {
+            name_en
+            starters
+          }
+          oddsNodes {
+            combString
+            oddsValue
+            hotFavourite
+            oddsDropValue
+            bankerOdds {
               combString
               oddsValue
-              hotFavourite
-              oddsDropValue
-              bankerOdds {
-                combString
-                oddsValue
-              }
             }
           }
         }
       }
-      """
-  }
-
-  response = requests.post(url, headers=headers, json=payload_odds)
-  if response.status_code == 200:
-      odds_data = response.json()
-          # Extracting the oddsValue into different types of oddsType and sorting by combString for QIN and QPL
-      # Initialize odds_values with empty lists for each odds type
-      odds_values = {
-          "WIN": [],
-          "PLA": [],
-          "QIN": [],
-          "QPL": [],
-          "FCT": [],
-          "TRI": [],
-          "FF": []
-      }
-      
-      race_meetings = odds_data.get('data', {}).get('raceMeetings', [])
-      for meeting in race_meetings:
-          pm_pools = meeting.get('pmPools', [])
-          for pool in pm_pools:
-              if place not in ['ST', 'HV']:
-                  id = pool.get('id')
-                  if id and id[8:10] != place:  # Check if id exists before slicing
-                      continue
-              odds_nodes = pool.get('oddsNodes', [])
-              odds_type = pool.get('oddsType')
-              odds_values[odds_type] = []
-              # Skip if odds_type is invalid or not in odds_values
-              if not odds_type or odds_type not in odds_values:
-                  continue
-              for node in odds_nodes:
-                  oddsValue = node.get('oddsValue')
-                  # Skip iteration if oddsValue is None, empty, or '---'
-                  if oddsValue == 'SCR':
-                      oddsValue = np.inf
-                  else:
-                      try:
-                          oddsValue = float(oddsValue)
-                      except (ValueError, TypeError):
-                          continue  # Skip if oddsValue can't be converted to float
-                  # Store data based on odds_type
-                  if odds_type in ["QIN", "QPL", "FCT", "TRI", "FF"]:
-                      comb_string = node.get('combString')
-                      if comb_string:  # Ensure combString exists
-                          odds_values[odds_type].append((comb_string, oddsValue))
-                  else:
-                      odds_values[odds_type].append(oddsValue)
-      # Sorting the odds values for specific types by combString in ascending order
-      for odds_type in ["QIN", "QPL", "FCT", "TRI", "FF"]:
-          odds_values[odds_type].sort(key=lambda x: x[0], reverse=False)
-      return odds_values
-
-      #print("WIN Odds Values:", odds_values["WIN"])
-      #print("PLA Odds Values:", odds_values["PLA"])
-      #print("QIN Odds Values (sorted by combString):", [value for _, value in odds_values["QIN"]])
-      #print("QPL Odds Values (sorted by combString):", [value for _, value in odds_values["QPL"]])
-
-  else:
-      st.error(f"Error: {response.status_code}")
+    }
+    """
+    
+    data = _fetch_graphql_data("racing", query, variables)
+    
+    odds_values = {
+        "WIN": [], "PLA": [], "QIN": [], "QPL": [],
+        "FCT": [], "TRI": [], "FF": []
+    }
+    
+    if data and 'data' in data:
+        race_meetings = data['data'].get('raceMeetings', [])
+        for meeting in race_meetings:
+            pm_pools = meeting.get('pmPools', [])
+            for pool in pm_pools:
+                if place not in ['ST', 'HV']:
+                    pool_id = pool.get('id')
+                    if pool_id and pool_id[8:10] != place:
+                        continue
+                
+                odds_nodes = pool.get('oddsNodes', [])
+                odds_type = pool.get('oddsType')
+                
+                if not odds_type or odds_type not in odds_values:
+                    continue
+                
+                # 清空該類型的舊資料（原程式碼邏輯）
+                odds_values[odds_type] = []
+                
+                for node in odds_nodes:
+                    oddsValue = node.get('oddsValue')
+                    if oddsValue == 'SCR':
+                        val = np.inf
+                    else:
+                        try:
+                            val = float(oddsValue)
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    if odds_type in ["QIN", "QPL", "FCT", "TRI", "FF"]:
+                        comb_string = node.get('combString')
+                        if comb_string:
+                            odds_values[odds_type].append((comb_string, val))
+                    else:
+                        odds_values[odds_type].append(val)
+                        
+        # 排序
+        for o_type in ["QIN", "QPL", "FCT", "TRI", "FF"]:
+            if odds_values[o_type]:
+                odds_values[o_type].sort(key=lambda x: x[0])
+                
+    return odds_values
 
 def fetch_hkjc_jockey_ranking():
     # 目前 2026 年 1 月正處於 2025/26 賽季中期
