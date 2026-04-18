@@ -1012,7 +1012,6 @@ def top(method_odds_df, method_investment_df, method):
     }
     one_min_no = int (60 / time_delay + 1) 
     third_min_no = int ((one_min_no - 1) * 3 + 1)
-    st.write(one_min_no, third_min_no)
     # Extract the first row from odds DataFrame
     first_row_odds = method_odds_df.iloc[0]
     first_row_odds_df = first_row_odds.to_frame(name='Odds').reset_index()
