@@ -1010,8 +1010,8 @@ def top(method_odds_df, method_investment_df, method):
         "plus_df": None,
         "notice_table": None
     }
-    one_min_no = int (60 / time_delay + 1 * (-1))
-    third_min_no = int (((one_min_no * (-1) - 1) * 3 + 1) * (-1))
+    one_min_no = int (60 / time_delay + 1) 
+    third_min_no = int ((one_min_no - 1) * 3 + 1)
     st.write(one_min_no, third_min_no)
     # Extract the first row from odds DataFrame
     first_row_odds = method_odds_df.iloc[0]
@@ -1022,12 +1022,12 @@ def top(method_odds_df, method_investment_df, method):
     last_row_odds = method_odds_df.iloc[-1]
     last_row_odds_df = last_row_odds.to_frame(name='Odds').reset_index()
     last_row_odds_df.columns = ['Combination', 'Odds']
-    third_last_row_index = max(-len(method_odds_df), third_min_no)
+    third_last_row_index = max(-len(method_odds_df), -third_min_no)
     third_last_row_odds = method_odds_df.iloc[third_last_row_index]
     third_last_row_odds_df = third_last_row_odds.to_frame(name='Odds').reset_index()
     third_last_row_odds_df.columns = ['Combination', 'Odds']
     # Extract the second last row from odds DataFrame (or the closest available row)
-    second_last_row_index = max(-len(method_odds_df), one_min_no)
+    second_last_row_index = max(-len(method_odds_df), -one_min_no)
     second_last_row_odds = method_odds_df.iloc[second_last_row_index]
     second_last_row_odds_df = second_last_row_odds.to_frame(name='Odds').reset_index()
     second_last_row_odds_df.columns = ['Combination', 'Odds']
@@ -1075,11 +1075,11 @@ def top(method_odds_df, method_investment_df, method):
     last_row_investment_df.columns = ['Combination', 'Investment']
 
     # Extract the second last row from investment DataFrame (or the closest available row)
-    second_last_row_index = max(-len(method_investment_df), one_min_no)
+    second_last_row_index = max(-len(method_investment_df), -one_min_no)
     second_last_row_investment = method_investment_df.iloc[second_last_row_index]
     second_last_row_investment_df = second_last_row_investment.to_frame(name='Investment').reset_index()
     second_last_row_investment_df.columns = ['Combination', 'Investment']
-    third_last_row_index = max(-len(method_investment_df), third_min_no)
+    third_last_row_index = max(-len(method_investment_df), -third_min_no)
     third_last_row_investment = method_investment_df.iloc[third_last_row_index]
     third_last_row_investment_df = third_last_row_investment.to_frame(name='Investment').reset_index()
     third_last_row_investment_df.columns = ['Combination', 'Investment']
