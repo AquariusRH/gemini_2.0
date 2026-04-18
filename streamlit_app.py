@@ -2279,46 +2279,35 @@ def parse_form_score(last6run_str):
     將 '1/2/4/11/2' 這樣的字串轉換為實力分數 (0-100)
     名次越小分數越高。
     """
-    if not last6run_str or not isinstance(last6run_str, str):
-        return 50 # 預設值
+    if not last6run_str or last6run_str == '-': return 50
     
-    try:
-        # 提取最近 3 場名次 (越近期的權重越高)
-        runs = []
-        parts = last6run_str.split('/')
-        for p in parts:
-            # 處理像 '12DH' 或 'PU' 這樣的異常值
-            clean_p = ''.join(filter(str.isdigit, p))
-            if clean_p:
-                runs.append(int(clean_p))
+    ranks = []
+    # 處理如 "1/2/3" 或 "1 2 3" 的格式
+    parts = re.split(r'[/ ]', str(last6run_str))
+    for p in parts:
+        p = p.strip()
+        if p.isdigit(): ranks.append(int(p))
+        elif p == '10': ranks.append(10)
+        elif p in ['UR', 'FE', 'DISQ']: ranks.append(14) # 意外視為最後
+
+    if not ranks: return 50
+    
+    # 只取最近 4 場，權重：0.4, 0.3, 0.2, 0.1
+    ranks = ranks[:4]
+    weights = [0.4, 0.3, 0.2, 0.1][:len(ranks)]
+    # 歸一化權重
+    weights = [w / sum(weights) for w in weights]
+    
+    weighted_rank = sum(r * w for r, w in zip(ranks, weights))
+    
+    # 趨勢獎勵：如果最近一場比前一場好
+    bonus = 0
+    if len(ranks) >= 2:
+        if ranks[0] < ranks[1]: bonus += 5
+        if ranks[0] <= 3: bonus += 5 # 進入前三名獎勵
         
-        if not runs:
-            return 50
-            
-        # 取最近 4 場
-        recent_runs = runs[:4] 
-        
-        # 計算平均名次 (加權：越近期的比賽權重越重)
-        weights = [2.0,1.5,1.2,1] # 權重
-        weighted_sum = 0
-        total_weight = 0
-        
-        # 對齊權重與場次
-        actual_weights = weights[-len(recent_runs):]
-        
-        for r, w in zip(recent_runs, actual_weights):
-            weighted_sum += r * w
-            total_weight += w
-            
-        avg_rank = weighted_sum / total_weight
-        
-        # 轉換為分數 (1名=100分, 14名=0分)
-        # 公式: 100 - (名次 - 1) * (100 / 13)
-        score = 100 - (avg_rank - 1) * 7.7
-        return max(0, min(100, score))
-        
-    except Exception:
-        return 50
+    score = 100 - (weighted_rank - 1) * 7.5 + bonus
+    return max(0, min(100, score))
 
 def calculate_jockey_score(jockey_name, ranking_df):
     """
