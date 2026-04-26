@@ -2394,37 +2394,20 @@ def calculate_trainer_score(trainer_name, trainer_df):
     
     score = (win_rate / max_rate) * 100
     return round(min(max(score, 15), 100), 1)
-def calculate_smart_score(race_no, target_time=None):
+def calculate_smart_score(race_no):
     """
     計算單場賽事的綜合評分，並將所有中間結果整合到單一 df。
-    如果提供 target_time，則計算該時間點的評分。
     """
     
     # ----------------------------------------------------
     # I. 數據準備與初始 df 建立
     # ----------------------------------------------------
     
-    # 1. 獲取賠率 (Odds)
+    # 1. 獲取最新賠率 (Odds)
     if 'WIN' not in st.session_state.odds_dict or st.session_state.odds_dict['WIN'].empty:
         return pd.DataFrame()
         
-    if target_time is None:
-        latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
-    else:
-        # 確保 target_time 存在於索引中，或者尋找最接近的過去時間
-        try:
-            if target_time in st.session_state.odds_dict['WIN'].index:
-                latest_odds = st.session_state.odds_dict['WIN'].loc[[target_time]].T
-            else:
-                available_times = st.session_state.odds_dict['WIN'].index
-                past_times = available_times[available_times <= target_time]
-                if len(past_times) > 0:
-                    latest_odds = st.session_state.odds_dict['WIN'].loc[[past_times[-1]]].T
-                else:
-                    latest_odds = st.session_state.odds_dict['WIN'].head(1).T
-        except:
-            latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
-
+    latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
     latest_odds.columns = ['Odds']
     
     # 2. 獲取資金流向 (MoneyFlow)
@@ -2434,14 +2417,9 @@ def calculate_smart_score(race_no, target_time=None):
     for method in methodlist:
         # 檢查該種類是否存在於 session_state 且不為空
         if method in st.session_state.diff_dict and not st.session_state.diff_dict[method].empty:
-            if target_time is None:
-                # 提取最近 10 筆數據並加總
-                current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
-            else:
-                # 提取 target_time 之前的最近 10 筆數據
-                available_diff_times = st.session_state.diff_dict[method].index
-                past_diff_times = available_diff_times[available_diff_times <= target_time]
-                current_method_sum = st.session_state.diff_dict[method].loc[past_diff_times].tail(10).sum()
+            # 提取最近 10 筆數據並加總
+            # .sum() 會根據欄位加總，確保索引對齊
+            current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
             
             # 將加總後的數據加到總表中 (使用 add 函數可以自動處理索引不匹配的情況)
             total_money_flow['MoneyFlow'] = total_money_flow['MoneyFlow'].add(current_method_sum, fill_value=0)
@@ -2559,70 +2537,6 @@ def calculate_smart_score(race_no, target_time=None):
     df.loc[np.isinf(df['Odds']), 'TotalScore'] = 0                        
     return df.sort_values('TotalScore', ascending=False)
     
-@st.fragment
-def render_prediction_table_fragment(race_no):
-    """
-    使用 Fragment 封裝預測表格與時間滑軸，實現局部刷新。
-    """
-    st.markdown("### 🤖 實時資金流綜合預測排名")
-    
-    # 檢查數據是否存在
-    if 'WIN' not in st.session_state.odds_dict or st.session_state.odds_dict['WIN'].empty:
-        st.info("等待數據載入中...")
-        return
-
-    time_options = st.session_state.odds_dict['WIN'].index.tolist()
-    num_options = len(time_options)
-    
-    # 1. 處理自動跳轉邏輯
-    if 'prev_num_options' not in st.session_state:
-        st.session_state.prev_num_options = num_options
-        st.session_state.slider_val = num_options - 1
-    elif num_options > st.session_state.prev_num_options:
-        # 有新數據，更新計數並強制跳到最新
-        st.session_state.prev_num_options = num_options
-        st.session_state.slider_val = num_options - 1
-    
-    # 2. 顯示滑軸
-    time_labels = [t.strftime('%H:%M:%S') for t in time_options]
-    
-    # 確保 slider_val 不會超出範圍 (例如重置後)
-    if st.session_state.slider_val >= num_options:
-        st.session_state.slider_val = num_options - 1
-
-    selected_time_idx = st.select_slider(
-        "選擇查看時間點：",
-        options=range(num_options),
-        value=st.session_state.slider_val,
-        format_func=lambda x: time_labels[x],
-        key="prediction_time_slider"
-    )
-    
-    # 更新當前選擇的位置
-    st.session_state.slider_val = selected_time_idx
-    target_time = time_options[selected_time_idx]
-    
-    # 3. 顯示狀態提示
-    if selected_time_idx < num_options - 1:
-        st.warning(f"⚠️ 正在查看歷史數據：`{time_labels[selected_time_idx]}` (最新為 `{time_labels[-1]}`)")
-    else:
-        st.success(f"✅ 正在查看最新數據：`{time_labels[selected_time_idx]}`")
-
-    # 4. 執行計算 (傳入 target_time)
-    prediction_df = calculate_smart_score(race_no, target_time=target_time)
-
-    if not prediction_df.empty:
-        display_df = prediction_df.copy() 
-        display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'TotalScore']]
-        display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流(K)', '🔥綜合推薦分']
-        
-        # 格式化顯示
-        display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}" if pd.notnull(x) else "N/A")
-        display_df['近期資金流(K)'] = display_df['近期資金流(K)'].apply(lambda x: f"{x:.1f}" if pd.notnull(x) else "0.0")
-        display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].apply(lambda x: int(round(x)) if pd.notnull(x) else 0)
-
-        st.table(display_df.style.hide(axis='index'))
-
 def calculate_smart_score_static(race_no):
     """
     核心預測算法（靜態版）：專為比賽前一日，缺乏賠率和資金流數據時設計。
@@ -2813,25 +2727,48 @@ if monitoring_on:
             if show_move_bar:
                 print_plotly_advanced_bar(race_no,print_list)
             #plot_racing_monitor_dashboard()
-            # B. 實時預測排名 (使用 Fragment 局部刷新)
-            st.markdown("""
-                <style>
-                /* 強制所有表格的數據內容 (td) 不准換行 */
-                .stTable td {
-                    white-space: nowrap !important;
-                    vertical-align: middle;
-                }
-                /* 允許標題 (th) 換行，並縮小字體以騰出空間 */
-                .stTable th {
-                    white-space: normal !important;
-                    min-width: 60px; /* 給標題一個最小寬度，迫使它太擠時自動換行 */
-                    font-size: 14px !important;
-                    line-height: 1.1;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+            # B. 實時預測排名
+            st.markdown("### 🤖 實時資金流綜合預測排名")
+            prediction_df = calculate_smart_score(race_no)
+
+            if not prediction_df.empty:
             
-            render_prediction_table_fragment(race_no)
+                # --- 執行過濾邏輯 ---
+                display_df = prediction_df.copy() 
+                #current_winner = prediction_df.iloc[0]['顯示名稱']
+                #st.session_state.top_rank_history.append(current_winner)
+                #current_top_4 = prediction_df.head(4)['顯示名稱'].tolist()
+                #st.session_state.top_4_history.extend(current_top_4)
+                
+                #display_df = prediction_df.copy()
+                #display_df = display_df[['馬名','騎師','馬齡','Odds', 'MoneyFlow', 'TotalFormScore', 'TotalScore']]
+                #display_df.columns = ['馬名','騎師','馬齡','當前賠率', '近期資金流(K)', '近績評分', '🔥綜合推薦分']
+                display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'TotalScore']]
+                display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流(K)', '🔥綜合推薦分']
+                display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
+                display_df['近期資金流(K)'] = display_df['近期資金流(K)'].apply(lambda x: f"{x:.1f}")
+                #display_df['近績評分'] = display_df['近績評分'].astype(float).round(0).astype('Int64')
+                display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(float).round(0).astype('Int64')
+                
+
+                st.markdown("""
+                    <style>
+                    /* 強制所有表格的數據內容 (td) 不准換行 */
+                    .stTable td {
+                        white-space: nowrap !important;
+                        vertical-align: middle;
+                    }
+                    /* 允許標題 (th) 換行，並縮小字體以騰出空間 */
+                    .stTable th {
+                        white-space: normal !important;
+                        min-width: 60px; /* 給標題一個最小寬度，迫使它太擠時自動換行 */
+                        font-size: 14px !important;
+                        line-height: 1.1;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                 
+                st.table(display_df.style.hide(axis='index'))   
 
                 # 應用高亮函數
                 #st.table(display_df.style.apply(highlight_top_realtime, axis=1).hide(axis='index'))                
