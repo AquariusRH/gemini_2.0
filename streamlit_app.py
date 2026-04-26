@@ -2411,16 +2411,17 @@ def calculate_smart_score(race_no, target_time=None):
     if target_time is None:
         latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
     else:
-        # 尋找最接近 target_time 的賠率數據
+        # 確保 target_time 存在於索引中，或者尋找最接近的過去時間
         try:
-            # 獲取小於等於 target_time 的最後一筆數據
-            available_times = st.session_state.odds_dict['WIN'].index
-            past_times = available_times[available_times <= target_time]
-            if len(past_times) == 0:
-                # 如果沒有過去的時間，取第一筆
-                latest_odds = st.session_state.odds_dict['WIN'].head(1).T
+            if target_time in st.session_state.odds_dict['WIN'].index:
+                latest_odds = st.session_state.odds_dict['WIN'].loc[[target_time]].T
             else:
-                latest_odds = st.session_state.odds_dict['WIN'].loc[[past_times[-1]]].T
+                available_times = st.session_state.odds_dict['WIN'].index
+                past_times = available_times[available_times <= target_time]
+                if len(past_times) > 0:
+                    latest_odds = st.session_state.odds_dict['WIN'].loc[[past_times[-1]]].T
+                else:
+                    latest_odds = st.session_state.odds_dict['WIN'].head(1).T
         except:
             latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
 
