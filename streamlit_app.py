@@ -2838,7 +2838,7 @@ if monitoring_on:
                 </style>
                 """, unsafe_allow_html=True)
             
-            render_prediction_table_fragment(race_no)   
+            render_prediction_table_fragment(race_no)
 
                 # 應用高亮函數
                 #st.table(display_df.style.apply(highlight_top_realtime, axis=1).hide(axis='index'))                
