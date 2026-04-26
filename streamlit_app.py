@@ -2898,20 +2898,5 @@ else:
         display_df['評分負擔分'] = display_df['評分負擔分'].astype(int)
         display_df['🏆 靜態預測分'] = display_df['🏆 靜態預測分'].apply(lambda x: f"{x:.1f}")
 
-        # 高亮處理...
-        # （與前一回答中的高亮邏輯相同）
 
-        def highlight_top_static(row):
-            top_score = static_prediction_df['TotalScore'].max()
-            current_score = row['TotalScore'] if 'TotalScore' in row else 0
-            
-            if current_score >= top_score:
-                return ['background-color: #ffcccc'] * len(row)
-            elif current_score >= static_prediction_df['TotalScore'].nlargest(3).iloc[-1]:
-                return ['background-color: #ffffcc'] * len(row)
-            else:
-                return [''] * len(row)
-
-
-
-        st.dataframe(display_df.style.apply(highlight_top_static, axis=1), width='stretch')
+        st.dataframe(display_df, width='stretch')
