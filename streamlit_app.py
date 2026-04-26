@@ -2621,29 +2621,7 @@ def render_prediction_table_fragment(race_no):
         display_df['近期資金流(K)'] = display_df['近期資金流(K)'].apply(lambda x: f"{x:.1f}" if pd.notnull(x) else "0.0")
         display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].apply(lambda x: int(round(x)) if pd.notnull(x) else 0)
 
-        def highlight_top_realtime_internal(row):
-            # 獲取當前行的分數
-            current_score = row['🔥綜合推薦分']
-            
-            # 從原始計算結果中獲取最高分和第二高分
-            scores = prediction_df['TotalScore'].dropna().unique()
-            if len(scores) == 0:
-                return [''] * len(row)
-            
-            top_score = round(max(scores))
-            
-            # 排序分數以獲取第二高
-            sorted_scores = sorted(scores, reverse=True)
-            second_top_score = round(sorted_scores[1]) if len(sorted_scores) > 1 else top_score
-
-            if current_score == top_score:
-                return ['background-color: #ffcccc'] * len(row)
-            elif current_score == second_top_score:
-                 return ['background-color: #ffffcc'] * len(row)
-            else:
-                return [''] * len(row)
-
-        st.table(display_df.style.apply(highlight_top_realtime_internal, axis=1).hide(axis='index'))
+        st.table(display_df.style.hide(axis='index'))
 
 def calculate_smart_score_static(race_no):
     """
