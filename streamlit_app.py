@@ -2394,20 +2394,36 @@ def calculate_trainer_score(trainer_name, trainer_df):
     
     score = (win_rate / max_rate) * 100
     return round(min(max(score, 15), 100), 1)
-def calculate_smart_score(race_no):
+def calculate_smart_score(race_no, target_time=None):
     """
     計算單場賽事的綜合評分，並將所有中間結果整合到單一 df。
+    如果提供 target_time，則計算該時間點的評分。
     """
     
     # ----------------------------------------------------
     # I. 數據準備與初始 df 建立
     # ----------------------------------------------------
     
-    # 1. 獲取最新賠率 (Odds)
+    # 1. 獲取賠率 (Odds)
     if 'WIN' not in st.session_state.odds_dict or st.session_state.odds_dict['WIN'].empty:
         return pd.DataFrame()
         
-    latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
+    if target_time is None:
+        latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
+    else:
+        # 尋找最接近 target_time 的賠率數據
+        try:
+            # 獲取小於等於 target_time 的最後一筆數據
+            available_times = st.session_state.odds_dict['WIN'].index
+            past_times = available_times[available_times <= target_time]
+            if len(past_times) == 0:
+                # 如果沒有過去的時間，取第一筆
+                latest_odds = st.session_state.odds_dict['WIN'].head(1).T
+            else:
+                latest_odds = st.session_state.odds_dict['WIN'].loc[[past_times[-1]]].T
+        except:
+            latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
+
     latest_odds.columns = ['Odds']
     
     # 2. 獲取資金流向 (MoneyFlow)
@@ -2417,9 +2433,14 @@ def calculate_smart_score(race_no):
     for method in methodlist:
         # 檢查該種類是否存在於 session_state 且不為空
         if method in st.session_state.diff_dict and not st.session_state.diff_dict[method].empty:
-            # 提取最近 10 筆數據並加總
-            # .sum() 會根據欄位加總，確保索引對齊
-            current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
+            if target_time is None:
+                # 提取最近 10 筆數據並加總
+                current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
+            else:
+                # 提取 target_time 之前的最近 10 筆數據
+                available_diff_times = st.session_state.diff_dict[method].index
+                past_diff_times = available_diff_times[available_diff_times <= target_time]
+                current_method_sum = st.session_state.diff_dict[method].loc[past_diff_times].tail(10).sum()
             
             # 將加總後的數據加到總表中 (使用 add 函數可以自動處理索引不匹配的情況)
             total_money_flow['MoneyFlow'] = total_money_flow['MoneyFlow'].add(current_method_sum, fill_value=0)
@@ -2729,8 +2750,29 @@ if monitoring_on:
             #plot_racing_monitor_dashboard()
             # B. 實時預測排名
             st.markdown("### 🤖 實時資金流綜合預測排名")
-            prediction_df = calculate_smart_score(race_no)
+            #prediction_df = calculate_smart_score(race_no)
+            # --- 新增時間滑軸邏輯 ---
+            if not st.session_state.odds_dict['WIN'].empty:
+                time_options = st.session_state.odds_dict['WIN'].index.tolist()
+                if len(time_options) > 1:
+                    # 建立時間格式化顯示
+                    time_labels = [t.strftime('%H:%M:%S') for t in time_options]
+                    
+                    # 使用滑軸選擇時間點
+                    selected_time_idx = st.select_slider(
+                        "選擇查看時間點：",
+                        options=range(len(time_options)),
+                        value=len(time_options) - 1,
+                        format_func=lambda x: time_labels[x]
+                    )
+                    target_time = time_options[selected_time_idx]
+                    st.write(f"📅 正在查看 `{time_labels[selected_time_idx]}` 的預測排名")
+                else:
+                    target_time = None
+            else:
+                target_time = None
 
+            prediction_df = calculate_smart_score(race_no, target_time=target_time)
             if not prediction_df.empty:
             
                 # --- 執行過濾邏輯 ---
