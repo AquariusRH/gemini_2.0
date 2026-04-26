@@ -2751,27 +2751,52 @@ if monitoring_on:
             # B. 實時預測排名
             st.markdown("### 🤖 實時資金流綜合預測排名")
             #prediction_df = calculate_smart_score(race_no)
-            # --- 新增時間滑軸邏輯 ---
+            # --- 新增時間滑軸邏輯 (修正手動調整與自動跳回) ---
             if not st.session_state.odds_dict['WIN'].empty:
                 time_options = st.session_state.odds_dict['WIN'].index.tolist()
-                if len(time_options) > 1:
-                    # 建立時間格式化顯示
+                num_options = len(time_options)
+                
+                if num_options > 1:
                     time_labels = [t.strftime('%H:%M:%S') for t in time_options]
                     
-                    # 使用滑軸選擇時間點
+                    # 1. 檢測是否有新數據進入
+                    is_new_data = False
+                    if 'prev_num_options' not in st.session_state:
+                        st.session_state.prev_num_options = num_options
+                        st.session_state.slider_val = num_options - 1
+                        is_new_data = True
+                    elif num_options > st.session_state.prev_num_options:
+                        st.session_state.prev_num_options = num_options
+                        st.session_state.slider_val = num_options - 1 # 有新數據，強制跳到最後
+                        is_new_data = True
+                    
+                    # 2. 顯示滑軸
+                    # 注意：我們不直接在 value 使用 session_state，而是透過 key 讓 Streamlit 自己管理
+                    # 但當有新數據時，我們需要一個方式「重置」滑軸。
+                    # 在 Streamlit 中，改變 key 是重置組件最簡單的方法。
+                    slider_key = f"time_slider_{st.session_state.prev_num_options}"
+                    
                     selected_time_idx = st.select_slider(
                         "選擇查看時間點：",
-                        options=range(len(time_options)),
-                        value=len(time_options) - 1,
-                        format_func=lambda x: time_labels[x]
+                        options=range(num_options),
+                        value=st.session_state.slider_val,
+                        format_func=lambda x: time_labels[x],
+                        key=slider_key
                     )
+                    
+                    # 3. 儲存使用者當前選擇的位置
+                    st.session_state.slider_val = selected_time_idx
                     target_time = time_options[selected_time_idx]
-                    st.write(f"📅 正在查看 `{time_labels[selected_time_idx]}` 的預測排名")
+                    
+                    # 4. 顯示狀態
+                    if selected_time_idx < num_options - 1:
+                        st.warning(f"⚠️ 正在查看歷史數據：`{time_labels[selected_time_idx]}` (最新為 `{time_labels[-1]}`)")
+                    else:
+                        st.success(f"✅ 正在查看最新數據：`{time_labels[selected_time_idx]}`")
                 else:
                     target_time = None
             else:
                 target_time = None
-
             prediction_df = calculate_smart_score(race_no, target_time=target_time)
             if not prediction_df.empty:
             
