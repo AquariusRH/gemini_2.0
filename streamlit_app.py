@@ -72,7 +72,8 @@ def init_session_state():
         'jockey_ranking_df': pd.DataFrame(),
         'trainer_ranking_df': pd.DataFrame(),
         'top_rank_history': [],
-        'top_4_history': []
+        'top_4_history': [],
+        'high_moneyflow_alerts': pd.DataFrame(columns=["時間", "馬號", "當刻賠率", "moneyflow"])
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -2732,7 +2733,31 @@ if monitoring_on:
             prediction_df = calculate_smart_score(race_no)
 
             if not prediction_df.empty:
-            
+                high_flow_df = prediction_df[prediction_df['MoneyFlow'] > 500]
+                
+                if not high_flow_df.empty:
+                    new_alerts = []
+                    for horse_no, row in high_flow_df.iterrows():
+                        new_alerts.append({
+                            "時間": time_str,
+                            "馬號": horse_no,
+                            "當刻賠率": f"{row['Odds']:.1f}" if pd.notna(row['Odds']) else "-",
+                            "moneyflow": round(row['MoneyFlow'], 1)
+                        })
+                    new_alerts_df = pd.DataFrame(new_alerts)
+                    
+                    # 避免在同一時間點重複寫入相同資料
+                    if st.session_state.high_moneyflow_alerts.empty or time_str not in st.session_state.high_moneyflow_alerts["時間"].values:
+                        st.session_state.high_moneyflow_alerts = pd.concat([st.session_state.high_moneyflow_alerts, new_alerts_df], ignore_index=True)
+
+                # 使用 st.expander 顯示下拉式表格
+                with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 500)", expanded=False):
+                    if st.session_state.high_moneyflow_alerts.empty:
+                        st.info("目前尚無大於 500 的資金流紀錄。")
+                    else:
+                        # 將最新紀錄排在最上面以利閱讀
+                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="時間", ascending=False)
+                        st.dataframe(display_alerts, use_container_width=True, hide_index=True)
                 # --- 執行過濾邏輯 ---
                 display_df = prediction_df.copy() 
                 #current_winner = prediction_df.iloc[0]['顯示名稱']
