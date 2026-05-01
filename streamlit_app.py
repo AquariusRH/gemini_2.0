@@ -2753,7 +2753,7 @@ if monitoring_on:
                 # 使用 st.expander 顯示下拉式表格
                 with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 200)", expanded=False):
                     if st.session_state.high_moneyflow_alerts.empty:
-                        st.info("目前尚無大於 500 的資金流紀錄。")
+                        st.info("目前尚無大於 200 的資金流紀錄。")
                     else:
                         # 將最新紀錄排在最上面以利閱讀
                         display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="時間", ascending=False)
