@@ -2733,7 +2733,7 @@ if monitoring_on:
             prediction_df = calculate_smart_score(race_no)
 
             if not prediction_df.empty:
-                high_flow_df = prediction_df[prediction_df['MoneyFlow'] > 500]
+                high_flow_df = prediction_df[prediction_df['MoneyFlow'] > 200]
                 
                 if not high_flow_df.empty:
                     new_alerts = []
@@ -2751,7 +2751,7 @@ if monitoring_on:
                         st.session_state.high_moneyflow_alerts = pd.concat([st.session_state.high_moneyflow_alerts, new_alerts_df], ignore_index=True)
 
                 # 使用 st.expander 顯示下拉式表格
-                with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 500)", expanded=False):
+                with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 200)", expanded=False):
                     if st.session_state.high_moneyflow_alerts.empty:
                         st.info("目前尚無大於 500 的資金流紀錄。")
                     else:
