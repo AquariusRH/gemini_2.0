@@ -2712,6 +2712,7 @@ if monitoring_on:
                         
                         if seconds_left <= 0:
                             time_str = "已開跑"
+                            minutes = 0
                         else:
                             minutes = int(seconds_left // 60)
                             time_str = f"離開跑 {minutes} 分"  
