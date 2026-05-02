@@ -2739,6 +2739,7 @@ if monitoring_on:
                     new_alerts = []
                     for horse_no, row in high_flow_df.iterrows():
                         new_alerts.append({
+                            "分鐘": minutes,
                             "時間": time_str,
                             "馬號": horse_no,
                             "當刻賠率": f"{row['Odds']:.1f}" if pd.notna(row['Odds']) else "-",
@@ -2756,7 +2757,7 @@ if monitoring_on:
                         st.info("目前尚無大於 200 的資金流紀錄。")
                     else:
                         # 將最新紀錄排在最上面以利閱讀
-                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="時間", ascending=True)
+                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True)
                         st.dataframe(display_alerts, width='stretch', hide_index=True)
                 # --- 執行過濾邏輯 ---
                 display_df = prediction_df.copy() 
