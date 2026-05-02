@@ -2756,7 +2756,7 @@ if monitoring_on:
                         st.info("目前尚無大於 200 的資金流紀錄。")
                     else:
                         # 將最新紀錄排在最上面以利閱讀
-                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="時間", ascending=False)
+                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="時間", ascending=True)
                         st.dataframe(display_alerts, use_container_width=True, hide_index=True)
                 # --- 執行過濾邏輯 ---
                 display_df = prediction_df.copy() 
