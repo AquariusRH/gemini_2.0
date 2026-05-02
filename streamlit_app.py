@@ -2756,7 +2756,7 @@ if monitoring_on:
                     #    - 然後針對「時間」和「馬號」這兩個欄位去重，並保留第一個（即最大的那個）
                     st.session_state.high_moneyflow_alerts = (
                         combined_df.sort_values(by='moneyflow', ascending=False)
-                                   .drop_duplicates(subset=['時間'], keep='first')
+                                   .drop_duplicates(subset=['時間','馬號'], keep='first')
                                    .reset_index(drop=True)
                     )
 
