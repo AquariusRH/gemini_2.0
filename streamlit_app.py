@@ -2759,7 +2759,7 @@ if monitoring_on:
                     else:
                         # 將最新紀錄排在最上面以利閱讀
                         display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True)
-                        st.dataframe(display_alerts, width='stretch', hide_index=True)
+                        st.dataframe(display_alerts["時間", "馬號", "當刻賠率", "moneyflow"], width='stretch', hide_index=True)
                 # --- 執行過濾邏輯 ---
                 display_df = prediction_df.copy() 
                 #current_winner = prediction_df.iloc[0]['顯示名稱']
