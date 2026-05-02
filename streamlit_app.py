@@ -73,7 +73,7 @@ def init_session_state():
         'trainer_ranking_df': pd.DataFrame(),
         'top_rank_history': [],
         'top_4_history': [],
-        'high_moneyflow_alerts': pd.DataFrame(columns=["時間", "馬號", "當刻賠率", "moneyflow"])
+        'high_moneyflow_alerts': pd.DataFrame(columns=["分鐘","時間", "馬號", "當刻賠率", "moneyflow"])
     }
     for key, value in defaults.items():
         if key not in st.session_state:
