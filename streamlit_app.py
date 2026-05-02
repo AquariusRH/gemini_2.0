@@ -2748,9 +2748,17 @@ if monitoring_on:
                         })
                     new_alerts_df = pd.DataFrame(new_alerts)
                     
-                    # 避免在同一時間點重複寫入相同資料
-                    if st.session_state.high_moneyflow_alerts.empty or time_str not in st.session_state.high_moneyflow_alerts["時間"].values:
-                        st.session_state.high_moneyflow_alerts = pd.concat([st.session_state.high_moneyflow_alerts, new_alerts_df], ignore_index=True)
+                    # 1. 直接將新資料合併到既有的歷史紀錄中
+                    combined_df = pd.concat([st.session_state.high_moneyflow_alerts, new_alerts_df], ignore_index=True)
+                    
+                    # 2. 核心處理：
+                    #    - 先按 moneyflow 降序排序（大的在前）
+                    #    - 然後針對「時間」和「馬號」這兩個欄位去重，並保留第一個（即最大的那個）
+                    st.session_state.high_moneyflow_alerts = (
+                        combined_df.sort_values(by='moneyflow', ascending=False)
+                                   .drop_duplicates(subset=['時間'], keep='first')
+                                   .reset_index(drop=True)
+                    )
 
                 # 使用 st.expander 顯示下拉式表格
                 with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 200)", expanded=False):
