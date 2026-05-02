@@ -2757,7 +2757,7 @@ if monitoring_on:
                     else:
                         # 將最新紀錄排在最上面以利閱讀
                         display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="時間", ascending=True)
-                        st.dataframe(display_alerts, use_container_width=True, hide_index=True)
+                        st.dataframe(display_alerts, width='stretch', hide_index=True)
                 # --- 執行過濾邏輯 ---
                 display_df = prediction_df.copy() 
                 #current_winner = prediction_df.iloc[0]['顯示名稱']
