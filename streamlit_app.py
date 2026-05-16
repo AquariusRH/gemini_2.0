@@ -1584,8 +1584,8 @@ def print_henery_model(gamma=1.18):
                     sub_ov = ov_df[mask]
                     count = len(ov_df[mask])
                     plus_count = 0
-                    if not sub_ov.empty and '最初排名' in sub_ov.columns:
-                        plus_count = sub_ov['最初排名'].astype(str).str.contains(r'\+').sum()
+                    if not sub_ov.empty and '上一次排名' in sub_ov.columns:
+                        plus_count = sub_ov['上一次排名'].astype(str).str.contains(r'\+').sum()
                         
                     g_idx = all_horse_list.index(h_btn)
                     
