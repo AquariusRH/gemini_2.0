@@ -17,6 +17,7 @@ from collections import Counter
 import plotly.express as px
 import itertools
 import matplotlib.colors as mcolors
+from statsmodels.tsa.ar_model import AutoReg
 simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 # ==================== 0. 頁面與字型設定 ====================
@@ -73,6 +74,7 @@ def init_session_state():
         'trainer_ranking_df': pd.DataFrame(),
         'top_rank_history': [],
         'top_4_history': [],
+        'horse_history': {},
         'high_moneyflow_alerts': pd.DataFrame(columns=["分鐘","時間", "馬號", "當刻賠率", "moneyflow"])
     }
     for key, value in defaults.items():
@@ -1904,6 +1906,38 @@ def plot_racing_monitor_dashboard():
         st.plotly_chart(fig_odds, width='content', config={'displayModeBar': False})
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
+
+def detect_anomaly_ar(race_no, horse_no, current_val):
+    if race_no not in st.session_state.horse_history:
+        st.session_state.horse_history[race_no] = {}
+    if horse_no not in st.session_state.horse_history[race_no]:
+        st.session_state.horse_history[race_no][horse_no] = []
+    
+    history = st.session_state.horse_history[race_no][horse_no]
+    history.append(current_val)
+    
+    # 限制歷史長度為 20，避免記憶體洩漏
+    if len(history) > 20:
+        history.pop(0)
+    
+    # 資料量不足不偵測
+    if len(history) < 8:
+        return False, 0
+    
+    try:
+        # AR(2) 模型：捕捉資金流的慣性
+        model = AutoReg(history[:-1], lags=2)
+        model_fitted = model.fit()
+        pred = model_fitted.predict(start=len(history)-1, end=len(history)-1)[0]
+        
+        diff = current_val - pred
+        # 異常判定：實際值比預測值高出 2.5 倍歷史標準差
+        std_dev = np.std(history)
+        is_anomaly = diff > (std_dev * 2.5) and current_val > 200
+        
+        return is_anomaly, diff
+    except:
+        return False, 0
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
@@ -2847,6 +2881,25 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
+
+            for horse_no, row in prediction_df.iterrows():
+                    val = round(row['MoneyFlow'], 1)
+                    is_anomaly, diff = detect_anomaly_ar(race_no, horse_no, val)
+                    
+                    if is_anomaly:
+                        new_row = pd.DataFrame([{
+                            "分鐘": minutes, "時間": time_str, "馬號": horse_no, 
+                            "moneyflow": val, "異常說明": "📈 資金異常激增"
+                        }])
+                        st.session_state.anomaly_alerts = pd.concat([st.session_state.anomaly_alerts, new_row]).tail(15)
+
+                # 使用 st.expander 顯示
+                with st.expander("🚨 AR 模型資金異常偵測", expanded=False):
+                    if st.session_state.anomaly_alerts.empty:
+                        st.info("目前無資金異常訊號。")
+                    else:
+                        st.dataframe(st.session_state.anomaly_alerts, use_container_width=True, hide_index=True)
+                        
             if show_henery:
                 print_henery_model(gamma=1.18)
             time.sleep(time_delay)
