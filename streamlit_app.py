@@ -2893,12 +2893,12 @@ if monitoring_on:
                         }])
                         st.session_state.anomaly_alerts = pd.concat([st.session_state.anomaly_alerts, new_row]).tail(15)
 
-                    # 使用 st.expander 顯示
-                    with st.expander("🚨 AR 模型資金異常偵測", expanded=False):
-                        if st.session_state.anomaly_alerts.empty:
-                            st.info("目前無資金異常訊號。")
-                        else:
-                            st.dataframe(st.session_state.anomaly_alerts, use_container_width=True, hide_index=True)
+            # 使用 st.expander 顯示
+            with st.expander("🚨 AR 模型資金異常偵測", expanded=False):
+                if st.session_state.anomaly_alerts.empty:
+                    st.info("目前無資金異常訊號。")
+                else:
+                    st.dataframe(st.session_state.anomaly_alerts, use_container_width=True, hide_index=True)
                         
             if show_henery:
                 print_henery_model(gamma=1.18)
