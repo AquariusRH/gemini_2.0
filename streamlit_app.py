@@ -1908,14 +1908,15 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
-def detect_anomaly_ar(race_no, horse_no, current_val):
+def detect_anomaly_ar(race_no, horse_no, current_val, current_race_data):
+    # current_race_data 傳入當前 prediction_df 的所有資金流數據
     if race_no not in st.session_state.horse_history:
         st.session_state.horse_history[race_no] = {}
     if horse_no not in st.session_state.horse_history[race_no]:
         st.session_state.horse_history[race_no][horse_no] = []
     
-    history = st.session_state.horse_history[race_no][horse_no]
-    history.append(current_val)
+    hist = st.session_state.horse_history[race_no][horse_no]
+    hist.append(current_val)
     
     # 限制歷史長度為 20，避免記憶體洩漏
     if len(history) > 20:
@@ -1931,12 +1932,15 @@ def detect_anomaly_ar(race_no, horse_no, current_val):
         model_fitted = model.fit()
         pred = model_fitted.predict(start=len(history)-1, end=len(history)-1)[0]
         
-        diff = current_val - pred
-        # 異常判定：實際值比預測值高出 2.5 倍歷史標準差
-        std_dev = np.std(history)
-        is_anomaly = diff > (std_dev * 2.5) and current_val > 200
+        # 動態門檻：取當前該場所有馬匹資金流的平均值
+        avg_flow = current_race_data['MoneyFlow'].mean()
         
-        return is_anomaly, diff
+        # 判定標準：預測誤差 > 歷史標準差 + 當前場次平均的 0.5 倍 (過濾掉整體上升影響)
+        std_dev = np.std(hist)
+        threshold = (std_dev * 2.5) + (avg_flow * 0.5)
+        
+        is_anomaly = (current_val - pred) > threshold
+        return is_anomaly, (current_val - pred)
     except:
         return False, 0
 # ==================== 4. 主介面邏輯 ====================
@@ -2885,7 +2889,7 @@ if monitoring_on:
 
             for horse_no, row in prediction_df.iterrows():
                     val = round(row['MoneyFlow'], 1)
-                    is_anomaly, diff = detect_anomaly_ar(race_no, horse_no, val)
+                    is_anomaly, diff = detect_anomaly_ar(race_no, horse_no, val, prediction_df)
                     
                     if is_anomaly:
                         new_row = pd.DataFrame([{
