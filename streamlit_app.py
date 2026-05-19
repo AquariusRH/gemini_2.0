@@ -1919,18 +1919,18 @@ def detect_anomaly_ar(race_no, horse_no, current_val, current_race_data):
     hist.append(current_val)
     
     # 限制歷史長度為 20，避免記憶體洩漏
-    if len(history) > 20:
-        history.pop(0)
+    if len(hist) > 20:
+        hist.pop(0)
     
     # 資料量不足不偵測
-    if len(history) < 8:
+    if len(hist) < 8:
         return False, 0
     
     try:
         # AR(2) 模型：捕捉資金流的慣性
-        model = AutoReg(history[:-1], lags=2)
+        model = AutoReg(hist[:-1], lags=2)
         model_fitted = model.fit()
-        pred = model_fitted.predict(start=len(history)-1, end=len(history)-1)[0]
+        pred = model_fitted.predict(start=len(history)-1, end=len(hist)-1)[0]
         
         # 動態門檻：取當前該場所有馬匹資金流的平均值
         avg_flow = current_race_data['MoneyFlow'].mean()
