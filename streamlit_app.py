@@ -2899,7 +2899,7 @@ if monitoring_on:
                 if st.session_state.anomaly_alerts.empty:
                     st.info("目前無資金異常訊號。")
                 else:
-                    st.dataframe(st.session_state.anomaly_alerts, use_container_width=True, hide_index=True)
+                    st.dataframe(st.session_state.anomaly_alerts, width='stretch', hide_index=True)
                         
             if show_henery:
                 print_henery_model(gamma=1.18)
