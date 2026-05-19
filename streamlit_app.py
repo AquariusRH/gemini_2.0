@@ -75,6 +75,7 @@ def init_session_state():
         'top_rank_history': [],
         'top_4_history': [],
         'horse_history': {},
+        'anomaly_alerts': pd.DataFrame(columns=["分鐘", "時間", "馬號", "moneyflow", "異常說明"]),
         'high_moneyflow_alerts': pd.DataFrame(columns=["分鐘","時間", "馬號", "當刻賠率", "moneyflow"])
     }
     for key, value in defaults.items():
