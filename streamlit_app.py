@@ -2949,7 +2949,7 @@ if monitoring_on:
                 else:
                     display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=False)
                     # 顯示包含異常指數的表格
-                    st.dataframe(display_alerts[["時間", "馬號", "當刻賠率", "moneyflow", "異常指數"]], use_container_width=True, hide_index=True)
+                    st.dataframe(display_alerts[["時間", "馬號", "當刻賠率", "moneyflow", "異常指數"]], width='stretch', hide_index=True)
                         
             if show_henery:
                 print_henery_model(gamma=1.18)
