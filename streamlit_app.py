@@ -17,8 +17,6 @@ from collections import Counter
 import plotly.express as px
 import itertools
 import matplotlib.colors as mcolors
-from statsmodels.tsa.ar_model import AutoReg
-from sklearn.ensemble import IsolationForest
 simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 # ==================== 0. 頁面與字型設定 ====================
@@ -76,7 +74,6 @@ def init_session_state():
         'top_rank_history': [],
         'top_4_history': [],
         'horse_history': {},
-        'anomaly_alerts': pd.DataFrame(columns=["分鐘", "時間", "馬號", "moneyflow", "異常指數"]),
         'high_moneyflow_alerts': pd.DataFrame(columns=["分鐘","時間", "馬號", "當刻賠率", "moneyflow"])
     }
     for key, value in defaults.items():
@@ -1909,45 +1906,6 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
-def detect_anomaly_if(race_no, horse_no, current_mf, current_odds):
-    # 初始化歷史紀錄儲存空間
-    if 'if_horse_history' not in st.session_state:
-        st.session_state.if_horse_history = {}
-    if race_no not in st.session_state.if_horse_history:
-        st.session_state.if_horse_history[race_no] = {}
-    if horse_no not in st.session_state.if_horse_history[race_no]:
-        st.session_state.if_horse_history[race_no][horse_no] = []
-        
-    history = st.session_state.if_horse_history[race_no][horse_no]
-    
-    # 計算資金增量 (Delta)
-    prev_mf = history[-1][0] if len(history) > 0 else current_mf
-    delta_mf = current_mf - prev_mf
-    
-    # 打包特徵 [資金, 賠率, 增量]
-    odds_clean = current_odds if pd.notna(current_odds) else 0.0
-    current_features = [current_mf, odds_clean, delta_mf]
-    
-    history.append(current_features)
-    if len(history) > 20: history.pop(0) # 保持 20 筆資料視窗
-        
-    # 資料量不足不啟動模型
-    if len(history) < 8: return False, 0.0
-        
-    try:
-        # 模型：contamination 設為 0.1 代表抓取前 10% 的異常
-        clf = IsolationForest(n_estimators=50, contamination=0.1, random_state=42)
-        X = np.array(history)
-        clf.fit(X)
-        
-        pred = clf.predict([current_features])[0]
-        score = clf.decision_function([current_features])[0]
-        
-        # 異常判斷條件：被模型標記為 -1 且有明顯資金介入
-        is_anomaly = (pred == -1) and (delta_mf > 50 or current_mf > 150)
-        return is_anomaly, score
-    except:
-        return False, 0.0
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
@@ -2891,35 +2849,7 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
-            for horse_no, row in prediction_df.iterrows():
-                mf = round(row['MoneyFlow'], 1)
-                odds = row['Odds']
                 
-                # 執行孤立森林偵測
-                is_anomaly, score = detect_anomaly_if(race_no, horse_no, mf, odds)
-                
-                if is_anomaly:
-                    new_alert = pd.DataFrame([{
-                        "時間": time_str, 
-                        "馬號": horse_no, 
-                        "MoneyFlow": mf, 
-                        "異常指數": f"{abs(score):.3f}"
-                    }])
-                    
-                    # 合併到 session_state.anomaly_alerts
-                    st.session_state.anomaly_alerts = pd.concat([st.session_state.anomaly_alerts, new_alert], ignore_index=True)
-                    # 限制只保留最後 20 筆，避免過多
-                    st.session_state.anomaly_alerts = st.session_state.anomaly_alerts.tail(20)
-
-            # 顯示警報視窗
-            with st.expander("🚨 孤立森林 (Isolation Forest) 盤口異常訊號", expanded=True):
-                if st.session_state.anomaly_alerts.empty:
-                    st.info("目前尚無機器學習模型認定的資金異常。")
-                else:
-                    # 顯示表格 (確保欄位正確)
-                    display_df = st.session_state.anomaly_alerts.copy()
-                    st.dataframe(display_df, width='stretch', hide_index=True)
-                                
             if show_henery:
                 print_henery_model(gamma=1.18)
             time.sleep(time_delay)
