@@ -2947,7 +2947,7 @@ if monitoring_on:
                 if st.session_state.high_moneyflow_alerts.empty:
                     st.info("目前尚無機器學習模型認定的資金異常。")
                 else:
-                    display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=False)
+                    display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True)
                     # 顯示包含異常指數的表格
                     st.dataframe(display_alerts[["時間", "馬號", "當刻賠率", "moneyflow", "異常指數"]], width='stretch', hide_index=True)
                         
