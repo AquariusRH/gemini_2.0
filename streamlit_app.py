@@ -1909,12 +1909,8 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
-def detect_anomaly_isolation_forest(race_no, horse_no, current_mf, current_odds):
-    """
-    使用孤立森林進行多維度資金異常偵測
-    特徵包含：[當前資金流, 當前賠率, 10秒資金增量]
-    """
-    # 1. 確保 Session State 儲存空間已初始化
+def detect_anomaly_if(race_no, horse_no, current_mf, current_odds):
+    # 初始化歷史紀錄儲存空間
     if 'if_horse_history' not in st.session_state:
         st.session_state.if_horse_history = {}
     if race_no not in st.session_state.if_horse_history:
@@ -1924,49 +1920,33 @@ def detect_anomaly_isolation_forest(race_no, horse_no, current_mf, current_odds)
         
     history = st.session_state.if_horse_history[race_no][horse_no]
     
-    # 2. 計算這 10 秒內的資金增量 (Delta) -> 這對抓突發大單極度重要
-    if len(history) > 0:
-        prev_mf = history[-1][0] # 上一次的 MoneyFlow
-        delta_mf = current_mf - prev_mf
-    else:
-        delta_mf = 0
-        
-    # 3. 處理賠率 NaN 狀況並打包成特徵向量
+    # 計算資金增量 (Delta)
+    prev_mf = history[-1][0] if len(history) > 0 else current_mf
+    delta_mf = current_mf - prev_mf
+    
+    # 打包特徵 [資金, 賠率, 增量]
     odds_clean = current_odds if pd.notna(current_odds) else 0.0
     current_features = [current_mf, odds_clean, delta_mf]
     
-    # 將當前資料塞入歷史，並維持 20 筆的滾動視窗 (約過往 200 秒的盤口)
     history.append(current_features)
-    if len(history) > 20:
-        history.pop(0)
+    if len(history) > 20: history.pop(0) # 保持 20 筆資料視窗
         
-    # 4. 資料量不足時（小於 8 個採樣點，約 80 秒），不啟動機器學習模型
-    if len(history) < 8:
-        return False, 0.0
+    # 資料量不足不啟動模型
+    if len(history) < 8: return False, 0.0
         
     try:
-        # 轉換為 2D 矩陣以利 Scikit-Learn 運算
+        # 模型：contamination 設為 0.1 代表抓取前 10% 的異常
+        clf = IsolationForest(n_estimators=50, contamination=0.1, random_state=42)
         X = np.array(history)
-        
-        # 5. 建立孤立森林模型
-        # 【重要參數】contamination (污染率): 預期異常數據的比例
-        # 如果你覺得「依然沒有警報」，就把這裡從 0.05 調高到 0.1 或 0.15 (代表抓取前 15% 突兀的訊號)
-        clf = IsolationForest(n_estimators=50, contamination=0.10, random_state=42)
         clf.fit(X)
         
-        # 預測當前這個點是否為異常 (1: 正常, -1: 異常)
         pred = clf.predict([current_features])[0]
+        score = clf.decision_function([current_features])[0]
         
-        # 計算異常分數 (decision_function 越低代表越異常，負數即為異常)
-        anomaly_score = clf.decision_function([current_features])[0]
-        
-        # 6. 安全防護線：孤立森林是相對的。如果全場都沒動，有人多進 10 塊也會變異常。
-        # 因此我們加上一條底線：必須被模型判定為 -1，且【10秒內增量大於 50】或【絕對金額大於 150】才正式觸發。
+        # 異常判斷條件：被模型標記為 -1 且有明顯資金介入
         is_anomaly = (pred == -1) and (delta_mf > 50 or current_mf > 150)
-        
-        return is_anomaly, anomaly_score
+        return is_anomaly, score
     except:
-        # 防止模型極端狀況下報錯導致 Streamlit 畫面崩潰
         return False, 0.0
 # ==================== 4. 主介面邏輯 ====================
 
@@ -2911,45 +2891,34 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
-            new_alerts = []
-            # 遍歷當前場次的所有馬匹
             for horse_no, row in prediction_df.iterrows():
                 mf = round(row['MoneyFlow'], 1)
                 odds = row['Odds']
                 
-                # 呼叫孤立森林模型
-                is_anomaly, score = detect_anomaly_isolation_forest(race_no, horse_no, mf, odds)
+                # 執行孤立森林偵測
+                is_anomaly, score = detect_anomaly_if(race_no, horse_no, mf, odds)
                 
                 if is_anomaly:
-                    new_alerts.append({
-                        "分鐘": minutes,
-                        "時間": time_str,
-                        "馬號": horse_no,
-                        "當刻賠率": f"{odds:.1f}" if pd.notna(odds) else "-",
-                        "moneyflow": mf,
-                        "異常指數": f"{abs(score):.3f}" # 分數顯示
-                    })
-            
-            # 如果有偵測到異常，寫入 st.session_state 歷史紀錄中
-            if new_alerts:
-                new_alerts_df = pd.DataFrame(new_alerts)
-                
-                # 這裡沿用你最原始的「同一分鐘若有更高 moneyflow 則更新」的優化邏輯
-                combined_df = pd.concat([st.session_state.high_moneyflow_alerts, new_alerts_df], ignore_index=True)
-                st.session_state.high_moneyflow_alerts = (
-                    combined_df.sort_values(by='moneyflow', ascending=False)
-                               .drop_duplicates(subset=['時間', '馬號'], keep='first')
-                               .reset_index(drop=True)
-                )
+                    new_alert = pd.DataFrame([{
+                        "時間": time_str, 
+                        "馬號": horse_no, 
+                        "MoneyFlow": mf, 
+                        "異常指數": f"{abs(score):.3f}"
+                    }])
+                    
+                    # 合併到 session_state.anomaly_alerts
+                    st.session_state.anomaly_alerts = pd.concat([st.session_state.anomaly_alerts, new_alert], ignore_index=True)
+                    # 限制只保留最後 20 筆，避免過多
+                    st.session_state.anomaly_alerts = st.session_state.anomaly_alerts.tail(20)
 
-            # 使用 st.expander 顯示下拉式表格
-            with st.expander("🚨 孤立森林 (Isolation Forest) 盤口異常訊號", expanded=False):
-                if st.session_state.high_moneyflow_alerts.empty:
-                    st.info("目前尚無機器學習模型認定的資金異常。")
-                else:
-                    display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True)
-                    # 顯示包含異常指數的表格
-                    st.dataframe(display_alerts[["時間", "馬號", "當刻賠率", "moneyflow", "異常指數"]], width='stretch', hide_index=True)
+    # 顯示警報視窗
+    with st.expander("🚨 孤立森林 (Isolation Forest) 盤口異常訊號", expanded=True):
+        if st.session_state.anomaly_alerts.empty:
+            st.info("目前尚無機器學習模型認定的資金異常。")
+        else:
+            # 顯示表格 (確保欄位正確)
+            display_df = st.session_state.anomaly_alerts.copy()
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
                         
             if show_henery:
                 print_henery_model(gamma=1.18)
