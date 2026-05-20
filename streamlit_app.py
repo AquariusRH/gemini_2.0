@@ -1937,7 +1937,7 @@ def detect_anomaly_ar(race_no, horse_no, current_val, current_race_data):
         
         # 判定標準：預測誤差 > 歷史標準差 + 當前場次平均的 0.5 倍 (過濾掉整體上升影響)
         std_dev = np.std(hist)
-        threshold = (std_dev * 2.5) + (avg_flow * 0.5)
+        threshold = (std_dev * 1.5) + (avg_flow * 0.2)
         
         is_anomaly = (current_val - pred) > threshold
         return is_anomaly, (current_val - pred)
