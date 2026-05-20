@@ -2911,18 +2911,18 @@ if monitoring_on:
                     # 限制只保留最後 20 筆，避免過多
                     st.session_state.anomaly_alerts = st.session_state.anomaly_alerts.tail(20)
 
-    # 顯示警報視窗
-    with st.expander("🚨 孤立森林 (Isolation Forest) 盤口異常訊號", expanded=True):
-        if st.session_state.anomaly_alerts.empty:
-            st.info("目前尚無機器學習模型認定的資金異常。")
-        else:
-            # 顯示表格 (確保欄位正確)
-            display_df = st.session_state.anomaly_alerts.copy()
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-                        
-            if show_henery:
-                print_henery_model(gamma=1.18)
-            time.sleep(time_delay)
+            # 顯示警報視窗
+            with st.expander("🚨 孤立森林 (Isolation Forest) 盤口異常訊號", expanded=True):
+                if st.session_state.anomaly_alerts.empty:
+                    st.info("目前尚無機器學習模型認定的資金異常。")
+                else:
+                    # 顯示表格 (確保欄位正確)
+                    display_df = st.session_state.anomaly_alerts.copy()
+                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+                                
+                    if show_henery:
+                        print_henery_model(gamma=1.18)
+                    time.sleep(time_delay)
         
 
 
