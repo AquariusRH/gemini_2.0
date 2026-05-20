@@ -2911,7 +2911,7 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
-
+            new_alerts = []
             # 遍歷當前場次的所有馬匹
             for horse_no, row in prediction_df.iterrows():
                 mf = round(row['MoneyFlow'], 1)
