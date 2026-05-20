@@ -2773,7 +2773,11 @@ if monitoring_on:
                         st.info("目前尚無大於 500 的資金流紀錄。")
                     else:
                         # 將最新紀錄排在最上面以利閱讀
-                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True)
+                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True).copy()
+        
+                        # 2. 在顯示之前，將 moneyflow 轉為格式化字串 (只影響顯示，不影響原始資料)
+                        display_alerts["moneyflow"] = display_alerts["moneyflow"].apply(lambda x: f"{x:.1f}")
+                        
                         st.table(display_alerts[["時間", "馬號", "當刻賠率", "moneyflow"]], width='stretch', hide_index=True)
                 # --- 執行過濾邏輯 ---
                 display_df = prediction_df.copy() 
