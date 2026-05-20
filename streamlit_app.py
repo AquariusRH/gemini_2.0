@@ -2918,7 +2918,7 @@ if monitoring_on:
                 else:
                     # 顯示表格 (確保欄位正確)
                     display_df = st.session_state.anomaly_alerts.copy()
-                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    st.dataframe(display_df, width='stretch', hide_index=True)
                                 
             if show_henery:
                 print_henery_model(gamma=1.18)
