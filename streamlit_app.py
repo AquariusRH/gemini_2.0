@@ -2920,9 +2920,9 @@ if monitoring_on:
                     display_df = st.session_state.anomaly_alerts.copy()
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
                                 
-                    if show_henery:
-                        print_henery_model(gamma=1.18)
-                    time.sleep(time_delay)
+            if show_henery:
+                print_henery_model(gamma=1.18)
+            time.sleep(time_delay)
         
 
 
