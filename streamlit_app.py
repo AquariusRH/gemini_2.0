@@ -2655,7 +2655,6 @@ else:
 methodlist = ['WIN', 'PLA', 'QIN', 'QPL'] # 簡化預設
 time_delay = 10
 if len(st.session_state.race_dataframes[race_no]['馬名']) < 7:
-    st.write(st.session_state.race_dataframes[race_no])
     print_list = ['WIN&QIN','PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
@@ -2706,7 +2705,7 @@ if monitoring_on:
             now = now_naive + datere.relativedelta(hours=8)
             now = now.replace(tzinfo=HK_TZ)
             post_time_raw = st.session_state.post_time_dict.get(race_no)
-                    
+            st.write(st.session_state.race_dataframes[race_no])     
             if post_time_raw is None:
                         time_str = "未載入"
             else:
