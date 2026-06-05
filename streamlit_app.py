@@ -2704,8 +2704,7 @@ if monitoring_on:
             now_naive = datetime.now()
             now = now_naive + datere.relativedelta(hours=8)
             now = now.replace(tzinfo=HK_TZ)
-            post_time_raw = st.session_state.post_time_dict.get(race_no)
-            st.write(st.session_state.race_dataframes[race_no])     
+            post_time_raw = st.session_state.post_time_dict.get(race_no)  
             if post_time_raw is None:
                         time_str = "未載入"
             else:
