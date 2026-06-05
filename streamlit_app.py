@@ -2654,7 +2654,7 @@ else:
 
 methodlist = ['WIN', 'PLA', 'QIN', 'QPL'] # 簡化預設
 time_delay = 10
-if len(st.session_state.race_dataframes[race_no]['馬名'])<7:
+if len(st.session_state.race_dataframes[race_no].query('~odd.isin([inf, -inf])')['馬名']) < 7:
     print_list = ['WIN&QIN','PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
