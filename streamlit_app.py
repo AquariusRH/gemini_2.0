@@ -2791,15 +2791,10 @@ if monitoring_on:
                 #display_df.columns = ['馬名','騎師','馬齡','當前賠率', '近期資金流(K)', '近績評分', '🔥綜合推薦分']
                 display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'OverallMoneyFlow', 'TotalScore']]
                 display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流', '總資金流', '🔥綜合推薦分']
-                df_styled = display_df.style \
-                    .format({
-                        '當前賠率': '{:.1f}',
-                        '近期資金流': '{:.1f}',
-                        '總資金流': '{:.1f}',
-                        '🔥綜合推薦分': '{:.0f}'
-                    }) \
-                    .bar(subset=['近期資金流', '總資金流'], color='#d65f5f', align='left') \
-                    .hide(axis='index')
+                display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
+                display_df['近期資金流'] = display_df['近期資金流'].apply(lambda x: f"{x:.0f}")
+                display_df['累計資金流'] = display_df['累計資金流'].apply(lambda x: f"{x:.0f}")
+                display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(int)
                                 
 
                 st.markdown("""
@@ -2819,8 +2814,8 @@ if monitoring_on:
                     </style>
                     """, unsafe_allow_html=True)
                  
-                #st.table(display_df.style.hide(axis='index'))   
-                st.dataframe(df_styled, use_container_width=True)
+                st.table(display_df.style.hide(axis='index'))   
+
                 # 應用高亮函數
                 #st.table(display_df.style.apply(highlight_top_realtime, axis=1).hide(axis='index'))                
                 #if len(st.session_state.top_rank_history) > 20:
