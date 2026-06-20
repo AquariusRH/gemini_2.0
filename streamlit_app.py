@@ -2789,12 +2789,14 @@ if monitoring_on:
                 #display_df = prediction_df.copy()
                 #display_df = display_df[['馬名','騎師','馬齡','Odds', 'MoneyFlow', 'TotalFormScore', 'TotalScore']]
                 #display_df.columns = ['馬名','騎師','馬齡','當前賠率', '近期資金流(K)', '近績評分', '🔥綜合推薦分']
-                display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'OverallMoneyFlow', 'TotalScore']]
-                display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流', '總資金流', '🔥綜合推薦分']
+                display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'OverallMoneyFlow']
+                                         #, 'TotalScore']]
+                display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流', '總資金流']
+                                      #, '🔥綜合推薦分']
                 display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
-                display_df['近期資金流'] = display_df['近期資金流'].apply(lambda x: f"{x:.0f}")
-                display_df['總資金流'] = display_df['總資金流'].apply(lambda x: f"{x:.0f}")
-                display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(int)
+                display_df['近期資金流'] = display_df['近期資金流'].apply(lambda x: f"{x:.1f}k")
+                display_df['總資金流'] = display_df['總資金流'].apply(lambda x: f"{x:.1f}k")
+                #display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(int)
                                 
 
                 st.markdown("""
