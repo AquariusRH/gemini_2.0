@@ -1912,7 +1912,7 @@ def plot_racing_monitor_dashboard():
 with st.sidebar:
     st.header("設定")
     Date = st.date_input('日期:', value=datetime.now(timezone(timedelta(hours=8))).date())
-    place = st.selectbox('場地:', ['ST', 'HV', 'S1', 'S2', 'S3' , 'S4'])
+    place = st.selectbox('場地:', ['ST', 'HV', 'S1', 'S2', 'S3' , 'S4', 'S5'])
     race_no = st.selectbox('場次:', np.arange(1, 12))
     
     st.markdown("---")
