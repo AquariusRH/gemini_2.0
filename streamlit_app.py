@@ -2793,7 +2793,7 @@ if monitoring_on:
                 display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流', '總資金流', '🔥綜合推薦分']
                 display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
                 display_df['近期資金流'] = display_df['近期資金流'].apply(lambda x: f"{x:.0f}")
-                display_df['累計資金流'] = display_df['總資金流'].apply(lambda x: f"{x:.0f}")
+                display_df['總資金流'] = display_df['總資金流'].apply(lambda x: f"{x:.0f}")
                 display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(int)
                                 
 
