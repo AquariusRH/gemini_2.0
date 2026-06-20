@@ -2421,22 +2421,22 @@ def calculate_smart_score(race_no):
     # 2. 獲取資金流向 (MoneyFlow)
     # 建立一個基礎的 DataFrame，索引與 latest_odds 一致，初始值為 0
     total_money_flow = pd.DataFrame(0, index=latest_odds.index, columns=['MoneyFlow'])
-    
+    total_overall_flow = pd.DataFrame(0, index=latest_odds.index, columns=['OverallMoneyFlow'])
     for method in methodlist:
         # 檢查該種類是否存在於 session_state 且不為空
         if method in st.session_state.diff_dict and not st.session_state.diff_dict[method].empty:
             # 提取最近 10 筆數據並加總
             # .sum() 會根據欄位加總，確保索引對齊
             current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
-            
+            all_time_sum = st.session_state.diff_dict[method].sum()
             # 將加總後的數據加到總表中 (使用 add 函數可以自動處理索引不匹配的情況)
             total_money_flow['MoneyFlow'] = total_money_flow['MoneyFlow'].add(current_method_sum, fill_value=0)
-    
+            total_overall_flow['OverallMoneyFlow'] = total_overall_flow['OverallMoneyFlow'].add(all_time_sum, fill_value=0)
     # 最後得到的 money_flow 就是四個種類加總後的結果
     money_flow = total_money_flow
         
     # 3. 建立基礎 df (包含動態數據)
-    df = pd.concat([latest_odds, money_flow], axis=1)
+    df = pd.concat([latest_odds, money_flow, total_overall_flow], axis=1)
     
     # 4. 獲取靜態數據
     if race_no not in st.session_state.race_dataframes:
@@ -2789,13 +2789,18 @@ if monitoring_on:
                 #display_df = prediction_df.copy()
                 #display_df = display_df[['馬名','騎師','馬齡','Odds', 'MoneyFlow', 'TotalFormScore', 'TotalScore']]
                 #display_df.columns = ['馬名','騎師','馬齡','當前賠率', '近期資金流(K)', '近績評分', '🔥綜合推薦分']
-                display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'TotalScore']]
-                display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流(K)', '🔥綜合推薦分']
-                display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
-                display_df['近期資金流(K)'] = display_df['近期資金流(K)'].apply(lambda x: f"{x:.1f}")
-                #display_df['近績評分'] = display_df['近績評分'].astype(float).round(0).astype('Int64')
-                display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(float).round(0).astype('Int64')
-                
+                display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow', 'OverallMoneyFlow', 'TotalScore']]
+                display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流', '總資金流', '🔥綜合推薦分']
+                df_styled = display_df.style \
+                    .format({
+                        '當前賠率': '{:.1f}',
+                        '近期資金流': '{:.1f}',
+                        '總資金流': '{:.1f}',
+                        '🔥綜合推薦分': '{:.0f}'
+                    }) \
+                    .bar(subset=['近期資金流', '總資金流'], color='#d65f5f', align='left') \
+                    .hide(axis='index')
+                                
 
                 st.markdown("""
                     <style>
@@ -2814,8 +2819,8 @@ if monitoring_on:
                     </style>
                     """, unsafe_allow_html=True)
                  
-                st.table(display_df.style.hide(axis='index'))   
-
+                #st.table(display_df.style.hide(axis='index'))   
+                st.dataframe(df_styled, use_container_width=True)
                 # 應用高亮函數
                 #st.table(display_df.style.apply(highlight_top_realtime, axis=1).hide(axis='index'))                
                 #if len(st.session_state.top_rank_history) > 20:
