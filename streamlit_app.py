@@ -753,17 +753,17 @@ def print_bar_chart(time_now):
           change_data = st.session_state.diff_dict[method].iloc[-1]
       elif method == 'WIN&QIN':
           df = st.session_state.overall_investment_dict['WIN'] + st.session_state.overall_investment_dict['QIN']
-          change_data_1 = st.session_state.diff_dict['WIN'].tail(10).sum(axis = 0) 
-          change_data_2 = st.session_state.diff_dict['QIN'].tail(10).sum(axis = 0)
+          change_data_1 = st.session_state.diff_dict['WIN'].tail(20).sum(axis = 0) 
+          change_data_2 = st.session_state.diff_dict['QIN'].tail(20).sum(axis = 0)
           odds_list = st.session_state.odds_dict['WIN']
       elif method == 'PLA&QPL':
           df = st.session_state.overall_investment_dict['PLA'] + st.session_state.overall_investment_dict['QPL']
-          change_data_1 = st.session_state.diff_dict['PLA'].tail(10).sum(axis=0)
-          change_data_2 = st.session_state.diff_dict['QPL'].tail(10).sum(axis=0)
+          change_data_1 = st.session_state.diff_dict['PLA'].tail(20).sum(axis=0)
+          change_data_2 = st.session_state.diff_dict['QPL'].tail(20).sum(axis=0)
           odds_list = st.session_state.odds_dict['PLA']
       elif method in methodlist:
           df = st.session_state.overall_investment_dict[method]
-          change_data_1 = st.session_state.diff_dict[method].tail(10).sum(axis = 0)
+          change_data_1 = st.session_state.diff_dict[method].tail(20).sum(axis = 0)
           change_data_2 = pd.Series(0, index=df.columns)
           odds_list = st.session_state.odds_dict[method]
       if df.empty:
