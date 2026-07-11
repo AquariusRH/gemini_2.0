@@ -1104,8 +1104,8 @@ def top(method_odds_df, method_investment_df, method):
         final_df.columns = ['馬匹', '賠率', '最初賠率', '排名', '最初排名', '上一次排名', '投注變化', '投注', '一分鐘投注','三分鐘投注']
         target_df = final_df
         rows_with_plus = target_df[
-              target_df['最初排名'].astype(str).str.contains('\+') |
-              target_df['上一次排名'].astype(str).str.contains('\+')
+              target_df['最初排名'].astype(str).str.contains(r'\+') |
+              target_df['上一次排名'].astype(str).str.contains(r'\+')
         ][['馬匹', '賠率', '最初排名', '上一次排名']]
           # Apply the conditional formatting to the 初始排名 and 前一排名 columns and add a bar to the 投資變化 column
         styled_df = final_df.style.format({
@@ -1130,8 +1130,8 @@ def top(method_odds_df, method_investment_df, method):
         target_df = final_df.head(15)
         target_special_df = final_df.head(50)
         rows_with_plus = target_special_df[
-              target_special_df['最初排名'].astype(str).str.contains('\+') |
-              target_special_df['上一次排名'].astype(str).str.contains('\+')
+              target_special_df['最初排名'].astype(str).str.contains(r'\+') |
+              target_special_df['上一次排名'].astype(str).str.contains(r'\+')
         ][['組合', '賠率', '最初排名', '上一次排名', '一分鐘投注','三分鐘投注']]
         
     
