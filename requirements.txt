@@ -1,4 +1,4 @@
-streamlit =4.3.12
+streamlit =3.12.0
 pandas
 numpy
 requests
