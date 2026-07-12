@@ -1464,26 +1464,11 @@ def print_henery_model(gamma=1.18):
             return comb_str
     plus_df_clean['組合'] = plus_df_clean['組合'].apply(normalize_comb)
     def get_table_html(df, cmap_name):
-        # 建立一個副本以避免影響原始 DataFrame
-        styled_df = df.style
-        
-        # 檢查 'Value' 欄位是否有足夠的變化量來進行渲染
-        # 如果最大值等於最小值，或者數據為空，則跳過背景顏色渲染
-        val_min = df['Value'].min()
-        val_max = df['Value'].max()
-        
-        if val_max > val_min:
-            styled_df = styled_df.background_gradient(
-                subset=['Value'], 
-                cmap=cmap_name, 
-                vmin=val_min, 
-                vmax=val_max
-            )
-        
         return (
-            styled_df.format({"實時Q": "{:.1f}", "理論Q": "{:.1f}", "Value": "{:.2f}"})
-            .hide(axis='index')
-            .map(highlight_change, subset=['最初排名', '上一次排名'])
+            df.style.background_gradient(subset=['Value'], cmap=cmap_name)
+            .format({"實時Q": "{:.1f}", "理論Q": "{:.1f}", "Value": "{:.2f}"})
+            .hide(axis='index').map(highlight_change, subset=['最初排名', '上一次排名'])
+            # This CSS ensures headers don't wrap and the table fills the width
             .set_table_attributes('style="width:100%; border-collapse: collapse; white-space: nowrap;"')
             .to_html()
         )
