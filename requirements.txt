@@ -8,3 +8,4 @@ python-dateutil
 scikit-learn
 bs4
 statsmodels
+psycopg2-binary
