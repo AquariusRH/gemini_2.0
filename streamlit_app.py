@@ -17,6 +17,8 @@ from collections import Counter
 import plotly.express as px
 import itertools
 import matplotlib.colors as mcolors
+from supabase import Client, create_client
+from sklearn.ensemble import IsolationForest
 simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 # ==================== 0. 頁面與字型設定 ====================
