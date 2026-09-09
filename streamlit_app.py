@@ -2715,39 +2715,7 @@ if monitoring_on:
                 change_overall(time_now)
                 # 由於篇幅限制，假設已運行
                 st.session_state.last_update = time_now
-        # --- 策略 B：常規賠率 Snapshot 降頻寫入 (例如每 60 秒一次) ---
-                current_timestamp = time.time()
-                
-                # 檢查距離上一次寫入是否已滿 60 秒 (1 分鐘)
-                if current_timestamp - st.session_state.last_db_save >= 60:
-                    try:
-                        # 整理準備寫入的資料格式 (以賠率/資金流快照為例)
-                        prediction_df = calculate_smart_score(race_no)
-                        
-                        if not prediction_df.empty:
-                            snapshot_data = []
-                            for horse_no, row in prediction_df.iterrows():
-                                snapshot_data.append({
-                                    "race_date": date_str,
-                                    "venue": place,
-                                    "race_no": race_no,
-                                    "timestamp": time_now.isoformat(),
-                                    "horse_no": horse_no,
-                                    "horse_name": row['馬名'],
-                                    "odds": float(row['Odds']) if pd.notna(row['Odds']) else None,
-                                    "moneyflow": float(row['MoneyFlow']) if pd.notna(row['MoneyFlow']) else 0.0
-                                })
-                            
-                            # 批量寫入 Supabase
-                            supabase.table("horse_odds_snapshots").insert(snapshot_data).execute()
-                            
-                            # 關鍵：成功寫入後，更新最後寫入時間
-                            st.session_state.last_db_save = current_timestamp
-                            st.toast(f"☁️ 已成功同步 1 分鐘快照至 Supabase ({time_str})")
-                            
-                    except Exception as e:
-                        # 加上 try-except 避免 DB 異常導致 10 秒監控循環崩潰
-                        print(f"[Supabase 傳送失敗]: {e}")
+        
         # 3. 顯示結果
         with placeholder.container():
             HK_TZ = timezone(timedelta(hours=8))
@@ -2908,6 +2876,40 @@ if monitoring_on:
                 
             if show_henery:
                 print_henery_model(gamma=1.18)
+
+            # --- 策略 B：常規賠率 Snapshot 降頻寫入 (例如每 60 秒一次) ---
+            current_timestamp = time.time()
+            
+            # 檢查距離上一次寫入是否已滿 60 秒 (1 分鐘)
+            if current_timestamp - st.session_state.last_db_save >= 60:
+                try:
+                    # 整理準備寫入的資料格式 (以賠率/資金流快照為例)
+                    prediction_df = calculate_smart_score(race_no)
+                    
+                    if not prediction_df.empty:
+                        snapshot_data = []
+                        for horse_no, row in prediction_df.iterrows():
+                            snapshot_data.append({
+                                "race_date": date_str,
+                                "venue": place,
+                                "race_no": race_no,
+                                "timestamp": time_now.isoformat(),
+                                "horse_no": horse_no,
+                                "horse_name": row['馬名'],
+                                "odds": float(row['Odds']) if pd.notna(row['Odds']) else None,
+                                "moneyflow": float(row['MoneyFlow']) if pd.notna(row['MoneyFlow']) else 0.0
+                            })
+                        
+                        # 批量寫入 Supabase
+                        supabase.table("horse_odds_snapshots").insert(snapshot_data).execute()
+                        
+                        # 關鍵：成功寫入後，更新最後寫入時間
+                        st.session_state.last_db_save = current_timestamp
+                        st.toast(f"☁️ 已成功同步 1 分鐘快照至 Supabase ({time_str})")
+                        
+                except Exception as e:
+                    # 加上 try-except 避免 DB 異常導致 10 秒監控循環崩潰
+                    print(f"[Supabase 傳送失敗]: {e}")
             time.sleep(time_delay)
         
 
