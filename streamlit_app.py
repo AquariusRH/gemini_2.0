@@ -2713,7 +2713,26 @@ if monitoring_on:
                 change_overall(time_now)
                 # 由於篇幅限制，假設已運行
                 st.session_state.last_update = time_now
-        
+        # --- 策略 B：常規賠率 Snapshot 降頻寫入 (例如每 60 秒一次) ---
+                current_time = time.time()
+                if current_time - st.session_state.last_db_save >= 60:
+                    try:
+                        # 批量寫入當前賠率快照
+                        snapshot_payload = [
+                            {
+                                "race_date": date_str,
+                                "venue": place,
+                                "race_no": race_no,
+                                "timestamp": time_now.isoformat(),
+                                "horse_name": row['馬名'],
+                                "odds": float(row['Odds'])
+                            }
+                            for idx, row in prediction_df.iterrows()
+                        ]
+                        supabase.table("race_snapshots").insert(snapshot_payload).execute()
+                        st.session_state.last_db_save = current_time
+                    except Exception as e:
+                        print(f"[Supabase Error] Snapshot 寫入失敗: {e}")
         # 3. 顯示結果
         with placeholder.container():
             HK_TZ = timezone(timedelta(hours=8))
