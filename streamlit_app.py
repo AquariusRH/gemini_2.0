@@ -47,7 +47,21 @@ def get_chinese_font():
         # 設定 Matplotlib 全局字型
         plt.rcParams['font.family'] = fm.FontProperties(fname=FONT_FILE).get_name()
     return FONT_FILE
+# 1. 確保連線被 Cache，不隨循環重複創建
+def get_supabase_client() -> Client:
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
+supabase = get_supabase_client()
+
+# 2. 安全寫入函式 (防止網路異常卡死主程序)
+def safe_insert_alert(alerts_list):
+    if not alerts_list:
+        return
+    try:
+        # 使用批量寫入
+        supabase.table("moneyflow_alerts").insert(alerts_list).execute()
+    except Exception as e:
+        print(f"[Supabase Error] 寫入警報失敗: {e}")
 # 初始化字型
 get_chinese_font()
 
