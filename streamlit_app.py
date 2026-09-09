@@ -2739,7 +2739,7 @@ if monitoring_on:
                                 })
                             
                             # 批量寫入 Supabase
-                            supabase.table("race_snapshots").insert(snapshot_data).execute()
+                            supabase.table("horse_odds_snapshots").insert(snapshot_data).execute()
                             
                             # 關鍵：成功寫入後，更新最後寫入時間
                             st.session_state.last_db_save = current_timestamp
