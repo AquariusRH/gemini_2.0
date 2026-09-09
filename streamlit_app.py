@@ -85,6 +85,7 @@ def init_session_state():
         'count_history' : {},
         'api_called': False,
         'last_update': None,
+        'last_db_save': 0.0,
         'jockey_ranking_df': pd.DataFrame(),
         'trainer_ranking_df': pd.DataFrame(),
         'top_rank_history': [],
@@ -2689,8 +2690,7 @@ st.session_state.diff_dict.setdefault('overall', pd.DataFrame())
 
 # ==================== 5. 監控與顯示邏輯 (使用 Fragment 避免閃爍) ====================
 placeholder = st.empty()
-if "last_db_save" not in st.session_state:
-    st.session_state.last_db_save = time.time()
+
 if monitoring_on:
     while monitoring_on:
         # --- 實時監控模式 (比賽當日) ---
