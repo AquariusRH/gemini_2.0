@@ -2079,6 +2079,7 @@ with st.sidebar:
     show_top = st.toggle("🏆 顯示連贏賠率排名", key="show_top", value=True)
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
     save_db = st.toggle("儲存database", key="save_db", value=False)
+    show_qin_overall_heat_table = st.toggle("儲存連贏圖", key="show_qin_overall_heat_table", value=False)
 # --- 賽事資料加載 ---
 @st.cache_data(ttl=3600)
 def fetch_race_card(date_str, venue):
@@ -3003,6 +3004,13 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
+
+            if show_qin_overall_heat_table:
+                render_qin_overall_heat_table(
+                    qin_df=st.session_state.overall_investment_dict.get('QIN'),
+                    win_odds_df=st.session_state.odds_dict.get('WIN'),
+                    min_amount_threshold_k=300.0  # 門檻 300K
+                )
                 
             if show_henery:
                 print_henery_model(gamma=1.18)
