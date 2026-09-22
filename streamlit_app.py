@@ -1923,28 +1923,46 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import streamlit as st
+from datetime import datetime
+
 def render_qin_overall_heat_table(
     qin_df: pd.DataFrame,               # st.session_state.overall_investment_dict['QIN']
     win_odds_df: pd.DataFrame,          # st.session_state.odds_dict['WIN']
-    max_snapshots: int = 15             # 預設限制最近 15 分鐘 / 筆數
+    max_minutes: int = 15               # 顯示最近 15 分鐘
 ) -> None:
     """
-    顯示所有馬匹最近 15 分鐘的 QIN 資金熱力圖，僅在 >= 300K 時進行顯眼上色
+    將 15 秒頻率的 QIN 數據聚合為「1 分鐘」單位，並繪製最近 15 分鐘的全馬匹資金熱力圖
     """
     if qin_df is None or qin_df.empty:
         st.info("尚無 QIN 投注額歷史數據。")
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏全馬匹資金歷史掃描 (最近 15 分鐘 / 300K+ 亮色提醒)")
+    st.subheader("🔥 QIN 連贏全馬匹資金歷史掃描 (每 1 分鐘更新 / 300K+ 亮色提醒)")
 
-    # 1. 截取最近 15 分鐘 (15 筆) 數據
-    recent_qin_df = qin_df.tail(max_snapshots).copy()
+    # 1. 確保 Index 為 DatetimeIndex 並按 1 分鐘 (1min) 聚合，取每分鐘最新筆數 (.last())
+    qin_df_copy = qin_df.copy()
+    if not isinstance(qin_df_copy.index, pd.DatetimeIndex):
+        qin_df_copy.index = pd.to_datetime(qin_df_copy.index)
 
-    # 2. 獲取所有參賽馬號 (不刪減任何馬匹)
+    # 重採樣為 1 分鐘單位 (若該分鐘內有多次 15 秒數據，取最後一次)
+    qin_1min_df = qin_df_copy.resample('1min').last().dropna(how='all')
+
+    # 2. 截取最近 15 分鐘數據
+    recent_qin_df = qin_1min_df.tail(max_minutes)
+
+    if recent_qin_df.empty:
+        st.info("數據不足 1 分鐘。")
+        return
+
+    # 3. 獲取所有參賽馬號
     horse_cols = recent_qin_df.columns.tolist()
 
-    # 3. 按最新獨贏 (WIN) 賠率對馬匹排序 (熱門馬排在上方)
+    # 4. 按最新獨贏 (WIN) 賠率對馬匹排序 (熱門馬排在上方)
     if win_odds_df is not None and not win_odds_df.empty:
         latest_win_series = win_odds_df.iloc[-1]
         sorted_horse_cols = sorted(
@@ -1957,16 +1975,16 @@ def render_qin_overall_heat_table(
     else:
         sorted_horse_cols = sorted(horse_cols, key=lambda h: int(h) if str(h).isdigit() else str(h))
 
-    # 4. 轉置矩陣 (Y 軸為所有馬號，X 軸為時間；倒序讓熱門馬在頂部)
+    # 5. 轉置矩陣 (Y 軸為馬號，X 軸為時間；倒序讓熱門馬在頂部)
     heatmap_matrix_df = recent_qin_df[sorted_horse_cols].T.iloc[::-1]
 
-    # 時間格式化 (僅留 HH:MM:SS)
+    # 時間格式化 (因為已經是 1 分鐘單位，X 軸顯示 HH:MM 即可)
     formatted_x_labels = [
-        t.strftime('%H:%M:%S') if isinstance(t, (datetime, pd.Timestamp)) else str(t)
+        t.strftime('%H:%M') if isinstance(t, (datetime, pd.Timestamp)) else str(t)
         for t in heatmap_matrix_df.columns
     ]
 
-    # 5. 建構 Y 軸富文本標籤 (顯示馬號 + 賠率走勢)
+    # 6. 建構 Y 軸富文本標籤 (顯示馬號 + 賠率走勢)
     y_axis_rich_labels = []
     latest_win_series = win_odds_df.iloc[-1] if win_odds_df is not None and not win_odds_df.empty else None
     prev_win_series = win_odds_df.iloc[-4] if win_odds_df is not None and len(win_odds_df) >= 4 else (win_odds_df.iloc[0] if win_odds_df is not None and not win_odds_df.empty else None)
@@ -1991,14 +2009,14 @@ def render_qin_overall_heat_table(
             
         y_axis_rich_labels.append(rich_label)
 
-    # 6. 🎯 關鍵顏色設定：< 300K 保持深灰底色 (不上色)，>= 300K 著色
+    # 7. 顏色等級設定：< 300K 保持灰色不上色，>= 300K 上色
     z_min = 0.0
     z_max = 1000.0  # 以 1000K (100萬) 為頂級上限
 
     custom_colorscale = [
-        [0.0, 'rgba(40, 40, 40, 0.4)'],     # 0K: 深灰暗色 (不上色)
+        [0.0, 'rgba(40, 40, 40, 0.4)'],     # < 300K: 深灰暗色 (不上色)
         [0.2999, 'rgba(40, 40, 40, 0.4)'],  # < 300K: 保持不上色
-        [0.30, '#FFFF99'],                  # >= 300K: 亮黃色 (大資金)
+        [0.30, '#FFFF99'],                  # >= 300K: 亮黃色
         [0.4999, '#FFCC00'],                # 300K ~ 499K
         [0.50, '#FF9933'],                  # >= 500K: 橘色
         [0.6999, '#FF3300'],                # 500K ~ 699K
@@ -2006,7 +2024,7 @@ def render_qin_overall_heat_table(
         [1.00, '#4A0066']                   # >= 1000K+: 深紫
     ]
 
-    # 7. 文字顯示格式：小於 1K 顯示空白，其餘顯示 123K
+    # 文字顯示格式：< 1K 顯示空白，其餘顯示整數 K (如 350K)
     text_matrix = np.where(
         heatmap_matrix_df.values >= 1.0, 
         np.vectorize(lambda v: f"{v:.0f}K")(heatmap_matrix_df.values), 
@@ -2035,7 +2053,6 @@ def render_qin_overall_heat_table(
         hovertemplate="時間: %{x}<br>馬號: %{y}<br>QIN 總投注額: %{z:.1f}K<extra></extra>"
     ))
 
-    # 動態計算圖表高度 (確保 14 匹馬都有充足空間顯示)
     chart_height = max(350, 80 + (len(sorted_horse_cols) * 38))
 
     fig_heat.update_layout(
@@ -2045,7 +2062,7 @@ def render_qin_overall_heat_table(
         plot_bgcolor='rgba(0,0,0,0)',
         dragmode=False,
         font=dict(color="white"),
-        xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=-45),
+        xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0), # 15個時間點字體不長，可設為 0 度直立
         yaxis=dict(showgrid=False, title="馬號 / 賠率", fixedrange=True, tickfont=dict(size=14))
     )
 
@@ -3007,7 +3024,7 @@ if monitoring_on:
                 render_qin_overall_heat_table(
                     qin_df=st.session_state.overall_investment_dict.get('QIN'),
                     win_odds_df=st.session_state.odds_dict.get('WIN'),
-                    max_snapshots=15  # 顯示最近 15 分鐘/時間點
+                    max_minutes=15  # 自動拉取最近 15 分鐘的數據 (共 15 個欄位)
                 )
                 
             if show_henery:
