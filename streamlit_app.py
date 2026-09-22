@@ -1927,7 +1927,7 @@ def render_qin_overall_heat_table(
     qin_df: pd.DataFrame,               # st.session_state.overall_investment_dict['QIN']
     win_odds_df: pd.DataFrame,          # st.session_state.odds_dict['WIN']
     max_minutes: int = 15               # 顯示最近 15 分鐘
-) -> None:
+):
     """
     將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，並繪製最近 15 分鐘資金變化熱力圖
     """
