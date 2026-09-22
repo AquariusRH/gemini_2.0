@@ -2068,7 +2068,7 @@ def render_qin_overall_heat_table(
         yaxis=dict(showgrid=False, title="馬號 / 賠率", fixedrange=True, tickfont=dict(size=14))
     )
 
-    st.plotly_chart(fig_heat, use_container_width=True)
+    st.plotly_chart(fig_heat, use_container_width=True,key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')}")
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
