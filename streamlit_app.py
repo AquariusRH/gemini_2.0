@@ -2013,7 +2013,7 @@ def render_qin_overall_heat_table(
 
     # 9. 🎯 顏色等級設定：單分鐘增量 < 300K 保持灰色，>= 300K 亮色著色
     z_min = 0.0
-    z_max = 1000.0  # 單分鐘大資金上限 1M (1000K)
+    z_max = 100.0  # 單分鐘大資金上限 1M (1000K)
 
     custom_colorscale = [
         [0.0, 'rgba(40, 40, 40, 0.4)'],     # < 300K: 深灰暗色 (無顯著資金流入)
@@ -2046,8 +2046,8 @@ def render_qin_overall_heat_table(
         showscale=True,
         colorbar=dict(
             title="單分鐘資金增量",
-            tickvals=[0, 300, 500, 700, 1000],
-            ticktext=['<300K', '300K', '500K', '700K', '1M+']
+            tickvals=[0, 30, 50, 70, 100],
+            ticktext=['<30K', '30K', '50K', '70K', '100K+']
         ),
         text=text_matrix,
         texttemplate="%{text}",
@@ -2083,7 +2083,7 @@ with st.sidebar:
     
     # 監控開關
     monitoring_on = st.toggle("啟動即時監控", value=False)
-    keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", "bubble_key","save_db"]
+    keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", "bubble_key","save_db","show_qin_overall_heat_table"]
     if st.button("重置所有數據"):
         for key in list(st.session_state.keys()):
             if key not in keep_keys:
@@ -3028,7 +3028,7 @@ if monitoring_on:
                     win_odds_df=st.session_state.odds_dict.get('WIN'),
                     max_minutes=15  # 自動拉取最近 15 分鐘的數據 (共 15 個欄位)
                 )
-                st.write(st.session_state.overall_investment_dict.get('QIN'))
+                #st.write(st.session_state.overall_investment_dict.get('QIN'))
                 
             if show_henery:
                 print_henery_model(gamma=1.18)
