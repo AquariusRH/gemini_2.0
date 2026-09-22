@@ -1923,6 +1923,135 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
+def render_qin_overall_heat_table(
+    qin_df: pd.DataFrame,               # 直接傳入 st.session_state.overall_investment_dict['QIN']
+    win_odds_df: pd.DataFrame,          # 傳入 st.session_state.odds_dict['WIN'] (用於 Y 軸獨贏賠率與排序)
+    min_amount_threshold_k: float = 300.0, # 門檻：最新一筆數據達到 300K 才顯示
+    max_snapshots: int = 40             # 最多顯示最近 40 個時間點
+) -> None:
+    """
+    直接使用整體 QIN 馬匹投注額歷史數據 (overall_investment_dict['QIN']) 繪製資金橫向掃描圖
+    """
+    if qin_df is None or qin_df.empty:
+        st.info("尚無 QIN 投注額歷史數據。")
+        return
+
+    st.markdown("---")
+    st.subheader("🔥 QIN 連贏資金歷史橫向掃描 (300K / 500K / 700K+)")
+
+    # 1. 截取最近 max_snapshots 筆時間點數據
+    recent_qin_df = qin_df.tail(max_snapshots).copy()
+
+    # 2. 獲取所有馬號欄位
+    horse_cols = recent_qin_df.columns.tolist()
+
+    # 3. 按最新獨贏 (WIN) 賠率對馬匹進行排序 (熱門馬在上方)
+    if win_odds_df is not None and not win_odds_df.empty:
+        latest_win_series = win_odds_df.iloc[-1]
+        sorted_horse_cols = sorted(
+            horse_cols,
+            key=lambda h: pd.to_numeric(
+                latest_win_series.get(int(h) if str(h).isdigit() and int(h) in latest_win_series else h, 999), 
+                errors='coerce'
+            )
+        )
+    else:
+        sorted_horse_cols = sorted(horse_cols, key=lambda h: int(h) if str(h).isdigit() else str(h))
+
+    # 4. 篩選最新時間點 QIN 投注額 >= 300K 的馬匹
+    latest_row = recent_qin_df.iloc[-1]
+    active_horses = [
+        h for h in sorted_horse_cols 
+        if latest_row[h] >= min_amount_threshold_k
+    ]
+
+    if not active_horses:
+        st.info(f"當前沒有馬匹的 QIN 投注額達到 {min_amount_threshold_k:.0f}K (30萬)。")
+        return
+
+    # 5. 提取活躍馬匹並轉置矩陣 (Y 軸為馬號，倒序讓熱門馬在頂部)
+    heatmap_matrix_df = recent_qin_df[active_horses].T.iloc[::-1]
+
+    # 時間格式化 (僅留 HH:MM:SS)
+    formatted_x_labels = [
+        t.strftime('%H:%M:%S') if isinstance(t, (datetime, pd.Timestamp)) else str(t)
+        for t in heatmap_matrix_df.columns
+    ]
+
+    # 6. 建構 Y 軸富文本標籤 (顯示馬號 + 獨贏賠率與走勢)
+    y_axis_rich_labels = []
+    latest_win_series = win_odds_df.iloc[-1] if win_odds_df is not None and not win_odds_df.empty else None
+    prev_win_series = win_odds_df.iloc[-4] if win_odds_df is not None and len(win_odds_df) >= 4 else (win_odds_df.iloc[0] if win_odds_df is not None and not win_odds_df.empty else None)
+    prev_3_win_series = win_odds_df.iloc[-10] if win_odds_df is not None and len(win_odds_df) >= 10 else (win_odds_df.iloc[0] if win_odds_df is not None and not win_odds_df.empty else None)
+
+    for h in active_horses[::-1]:
+        horse_int = int(h) if str(h).isdigit() else h
+        col_key = horse_int if (latest_win_series is not None and horse_int in latest_win_series) else str(h)
+        
+        if latest_win_series is not None and col_key in latest_win_series:
+            curr_odds = pd.to_numeric(latest_win_series[col_key], errors='coerce')
+            prev_odds = pd.to_numeric(prev_win_series[col_key], errors='coerce') if prev_win_series is not None else curr_odds
+            prev_3_odds = pd.to_numeric(prev_3_win_series[col_key], errors='coerce') if prev_3_win_series is not None else curr_odds
+            
+            rich_label = (
+                f"<b>{horse_int:02d} 號</b> <span>{curr_odds:.1f}</span> <br>"
+                f"<span style='color:#888; font-size:12px'>({prev_odds:.1f})</span> "
+                f"<span style='color:#888; font-size:12px'>(({prev_3_odds:.1f}))</span>"
+            )
+        else:
+            rich_label = f"<b>{horse_int:02d} 號</b><br>-"
+            
+        y_axis_rich_labels.append(rich_label)
+
+    # 7. 🎯 300K / 500K / 700K 顏色分級漸層 (數值 300 即代表 300K)
+    z_min = 0.0
+    z_max = 1000.0  # 以 1000K (100萬) 為頂級上限
+
+    custom_colorscale = [
+        [0.0, '#FFFFFF'],    # < 300K: 白色
+        [0.299, '#F0F0F0'],  # < 300K: 淺灰
+        [0.3, '#FFFF99'],    # >= 300K: 淺黃色 (初級大資金)
+        [0.499, '#FFCC00'],  # 300K ~ 499K: 亮黃色
+        [0.5, '#FF9933'],    # >= 500K: 亮橘色 (中等大資金)
+        [0.699, '#FF3300'],  # 500K ~ 699K: 鮮紅色
+        [0.7, '#800080'],    # >= 700K: 紫色 (巨額過熱資金)
+        [1.0, '#4A0066']     # >= 1000K+: 深紫
+    ]
+
+    # 8. 繪製 Plotly Heatmap
+    fig_heat = go.Figure(data=go.Heatmap(
+        z=heatmap_matrix_df.values,
+        x=formatted_x_labels,
+        y=y_axis_rich_labels,
+        ygap=3,
+        zmin=z_min,
+        zmax=z_max,
+        colorscale=custom_colorscale,
+        showscale=True,
+        colorbar=dict(
+            title="QIN 投注額",
+            tickvals=[0, 300, 500, 700, 1000],
+            ticktext=['0', '300K', '500K', '700K', '1M+']
+        ),
+        texttemplate="%{z:.0f}K",
+        textfont={"size": 11},
+        hovertemplate="時間: %{x}<br>馬號: %{y}<br>QIN 總投注額: %{z:.1f}K<extra></extra>"
+    ))
+
+    chart_height = max(200, 100 + (len(active_horses) * 42))
+
+    fig_heat.update_layout(
+        height=chart_height,
+        margin=dict(t=20, b=20, l=120, r=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        dragmode=False,
+        font=dict(color="white"),
+        xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=-45),
+        yaxis=dict(showgrid=False, title="馬號 / 賠率", fixedrange=True, tickfont=dict(size=14))
+    )
+
+    st.plotly_chart(fig_heat, use_container_width=True)
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
