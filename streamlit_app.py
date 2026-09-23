@@ -2107,7 +2107,7 @@ def render_qin_overall_heat_table(
     )
 
     latest_ts = all_ts[-1].strftime("%H%M%S")
-    st.plotly_chart(fig_heat, width="stretch",key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')_{latest_ts}}")
+    st.plotly_chart(fig_heat, width="stretch",key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')}_{latest_ts}")
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
