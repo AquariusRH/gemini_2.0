@@ -2012,7 +2012,7 @@ def render_qin_overall_heat_table(
             
         # 組裝為 Y 軸 Label
         rich_label = (
-            f"<b>{horse_int:02d} 號</b> <span style='color:#FFD700;'>{odds_str}</span><br>"
+            f"<b>{horse_int:02d} 號</b> {odds_str}</span><br>"
             f"<span style='color:#AAAAAA; font-size:12px'>總投: {inv_str}</span>"
         )
         y_axis_rich_labels.append(rich_label)
