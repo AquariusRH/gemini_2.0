@@ -1923,49 +1923,48 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import streamlit as st
+from datetime import datetime
+
 def render_qin_overall_heat_table(
     qin_df: pd.DataFrame,               # st.session_state.overall_investment_dict['QIN']
     win_odds_df: pd.DataFrame,          # st.session_state.odds_dict['WIN']
-    max_minutes: int = 15               # 顯示最近 15 分鐘
+    max_minutes: int = 15               # 每次展示最近 15 分鐘的滑動視窗
 ) -> None:
     """
-    將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，套用 5 色階梯 (100K~500K+) 繪製熱力圖。
-    Y 軸顯示：馬號 + 最新獨贏賠率 + 最新累積總投注額。
+    將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，並透過 Plotly Frames + Sliders 
+    提供可拖動的時間軸，實現歷史時間點的資金熱力圖回溯。
     """
     if qin_df is None or qin_df.empty:
         st.info("尚無 QIN 投注額歷史數據。")
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏每分鐘資金變化 (1 Min Delta / 5色資金熱力圖)")
+    st.subheader("🔥 QIN 連贏每分鐘資金變化 (時間軸回溯版)")
 
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
     if not isinstance(qin_df_copy.index, pd.DatetimeIndex):
         qin_df_copy.index = pd.to_datetime(qin_df_copy.index)
 
-    # 2. 先將 15 秒採樣聚合為「每 1 分鐘最後的累積值」
+    # 2. 1分鐘採樣 + 計算增量 (Delta)
     qin_1min_cum_df = qin_df_copy.resample('1min').last().ffill()
-
-    # 3. 計算每 1 分鐘的「增量」(當前分鐘累積 - 上一分鐘累積)
     qin_1min_delta_df = qin_1min_cum_df.diff()
 
-    # 第一筆數據若無前一分鐘可減，保留原值或設為 0
     if len(qin_1min_delta_df) > 0:
         qin_1min_delta_df.iloc[0] = qin_1min_delta_df.iloc[0].fillna(qin_1min_cum_df.iloc[0])
     qin_1min_delta_df = qin_1min_delta_df.fillna(0)
 
-    # 4. 截取最近 15 分鐘的增量數據
-    recent_qin_df = qin_1min_delta_df.tail(max_minutes)
-
-    if recent_qin_df.empty:
+    all_ts = qin_1min_delta_df.index
+    if len(all_ts) == 0:
         st.info("數據不足 1 分鐘。")
         return
 
-    # 5. 獲取所有參賽馬號
-    horse_cols = recent_qin_df.columns.tolist()
-
-    # 6. 按最新獨贏 (WIN) 賠率對馬匹排序 (熱門馬排在上方)
+    # 3. 獲取馬號與排序 (依最新獨贏賠率)
+    horse_cols = qin_1min_delta_df.columns.tolist()
     if win_odds_df is not None and not win_odds_df.empty:
         latest_win_series = win_odds_df.iloc[-1]
         sorted_horse_cols = sorted(
@@ -1978,16 +1977,7 @@ def render_qin_overall_heat_table(
     else:
         sorted_horse_cols = sorted(horse_cols, key=lambda h: int(h) if str(h).isdigit() else str(h))
 
-    # 7. 轉置矩陣 (Y 軸為馬號，X 軸為時間；倒序讓熱門馬在頂部)
-    heatmap_matrix_df = recent_qin_df[sorted_horse_cols].T.iloc[::-1]
-
-    # 時間格式化 (顯示 HH:MM)
-    formatted_x_labels = [
-        t.strftime('%H:%M') if isinstance(t, (datetime, pd.Timestamp)) else str(t)
-        for t in heatmap_matrix_df.columns
-    ]
-
-    # 8. 建構 Y 軸富文本標籤 (馬號 + 最新獨贏賠率 + 最新 QIN 累積總投注額)
+    # 4. Y 軸固定標籤 (馬號 + 最新獨贏賠率 + 最新累積總投注額)
     y_axis_rich_labels = []
     latest_win_series = win_odds_df.iloc[-1] if win_odds_df is not None and not win_odds_df.empty else None
     latest_cum_series = qin_1min_cum_df.iloc[-1] if not qin_1min_cum_df.empty else None
@@ -1996,31 +1986,17 @@ def render_qin_overall_heat_table(
         horse_int = int(h) if str(h).isdigit() else h
         col_key = horse_int if (latest_win_series is not None and horse_int in latest_win_series) else str(h)
         
-        # 取得最新獨贏賠率
-        if latest_win_series is not None and col_key in latest_win_series:
-            curr_odds = pd.to_numeric(latest_win_series[col_key], errors='coerce')
-            odds_str = f"{curr_odds:.1f}"
-        else:
-            odds_str = "-"
-
-        # 取得最新累積總投注額
-        if latest_cum_series is not None and h in latest_cum_series:
-            latest_inv = pd.to_numeric(latest_cum_series[h], errors='coerce')
-            inv_str = f"{latest_inv:.0f}K"
-        else:
-            inv_str = "-"
+        odds_str = f"{pd.to_numeric(latest_win_series[col_key], errors='coerce'):.1f}" if (latest_win_series is not None and col_key in latest_win_series) else "-"
+        inv_str = f"{pd.to_numeric(latest_cum_series[h], errors='coerce'):.0f}K" if (latest_cum_series is not None and h in latest_cum_series) else "-"
             
-        # 組裝為 Y 軸 Label
         rich_label = (
-            f"<b>{horse_int:02d} 號</b> {odds_str}</span><br>"
+            f"<b>{horse_int:02d} 號</b>{odds_str}</span><br>"
             f"<span style='color:#AAAAAA; font-size:12px'>總投: {inv_str}</span>"
         )
         y_axis_rich_labels.append(rich_label)
 
-    # 9. 5 色分級設定 (100K / 200K / 300K / 400K / 500K)
-    z_min = 0.0
-    z_max = 500.0
-
+    # 5. 5 色分級設定 (100K / 200K / 300K / 400K / 500K)
+    z_min, z_max = 0.0, 500.0
     custom_colorscale = [
         [0.0, 'rgba(40, 40, 40, 0.4)'],      # < 100K: 深灰底色
         [0.1999, 'rgba(40, 40, 40, 0.4)'], 
@@ -2035,49 +2011,103 @@ def render_qin_overall_heat_table(
         [1.00, '#9B51E0']                    # >= 500K+: 尊爵紫色
     ]
 
-    # 10. 文字顯示：單分鐘增量 < 1K 顯示空白，其餘顯示 "+123K"
-    text_matrix = np.where(
-        heatmap_matrix_df.values >= 1.0, 
-        np.vectorize(lambda v: f"+{v:.0f}K")(heatmap_matrix_df.values), 
-        ""
-    )
+    # 6. 🎯 構建時間軸動畫幀 (Frames)
+    frames = []
+    # 至少確保有數據可顯示，從第一個可集滿/可顯示的時間點開始生成幀
+    start_idx = min(max_minutes - 1, len(all_ts) - 1)
 
-    # 11. 繪製 Plotly Heatmap
-    fig_heat = go.Figure(data=go.Heatmap(
-        z=heatmap_matrix_df.values,
-        x=formatted_x_labels,
-        y=y_axis_rich_labels,
-        ygap=3,
-        xgap=2,
-        zmin=z_min,
-        zmax=z_max,
-        colorscale=custom_colorscale,
-        showscale=True,
-        colorbar=dict(
-            title="單分鐘資金增量",
-            tickvals=[0, 100, 200, 300, 400, 500],
-            ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+']
+    for i in range(start_idx, len(all_ts)):
+        # 截取截至時間點 i 往前推 max_minutes 分鐘的數據片段
+        frame_sub_df = qin_1min_delta_df.iloc[max(0, i - max_minutes + 1) : i + 1]
+        matrix_df = frame_sub_df[sorted_horse_cols].T.iloc[::-1]
+
+        x_labels = [
+            t.strftime('%H:%M') if isinstance(t, (datetime, pd.Timestamp)) else str(t)
+            for t in matrix_df.columns
+        ]
+
+        text_matrix = np.where(
+            matrix_df.values >= 1.0, 
+            np.vectorize(lambda v: f"+{v:.0f}K")(matrix_df.values), 
+            ""
+        )
+
+        ts_label = all_ts[i].strftime("%H:%M")
+
+        frames.append(go.Frame(
+            data=[go.Heatmap(
+                z=matrix_df.values,
+                x=x_labels,
+                y=y_axis_rich_labels,
+                text=text_matrix,
+                texttemplate="%{text}",
+                textfont={"size": 11},
+                hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
+            )],
+            name=ts_label
+        ))
+
+    if not frames:
+        st.info("數據不足以繪製時間軸。")
+        return
+
+    # 7. 設定預設展示最後一幀 (即最新時間)
+    initial_frame = frames[-1]
+
+    fig_heat = go.Figure(
+        data=[go.Heatmap(
+            z=initial_frame.data[0].z,
+            x=initial_frame.data[0].x,
+            y=initial_frame.data[0].y,
+            ygap=3,
+            xgap=2,
+            zmin=z_min,
+            zmax=z_max,
+            colorscale=custom_colorscale,
+            showscale=True,
+            colorbar=dict(
+                title="單分鐘資金增量",
+                tickvals=[0, 100, 200, 300, 400, 500],
+                ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+']
+            ),
+            text=initial_frame.data[0].text,
+            texttemplate="%{text}",
+            textfont={"size": 11},
+            hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
+        )],
+        layout=go.Layout(
+            height=max(480, 180 + (len(sorted_horse_cols) * 40)),
+            margin=dict(t=30, b=100, l=130, r=20),  # 底部留下 100px 空間容納 Slider
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            dragmode=False,
+            xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
+            yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13)),
+            
+            # 🎯 8. 設定 Plotly 時間軸滑塊 (Sliders)
+            sliders=[{
+                "active": len(frames) - 1, # 預設指針停在最新的時間
+                "currentvalue": {
+                    "prefix": "🕒 回溯截至時間: ",
+                    "font": {"size": 14, "color": "#FFD700"},
+                    "offset": 10
+                },
+                "pad": {"t": 40, "b": 10},
+                "steps": [
+                    {
+                        # "redraw": True 為關鍵：確保拖動時重新渲染顏色與文字矩陣
+                        "args": [[f.name], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}],
+                        "label": f.name,
+                        "method": "animate",
+                    } for f in frames
+                ]
+            }]
         ),
-        text=text_matrix,
-        texttemplate="%{text}",
-        textfont={"size": 11},
-        hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
-    ))
-
-    chart_height = max(350, 80 + (len(sorted_horse_cols) * 40))
-
-    fig_heat.update_layout(
-        height=chart_height,
-        margin=dict(t=20, b=20, l=130, r=20),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        dragmode=False,
-        xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
-        yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13))
+        frames=frames
     )
 
-    # 適應新版 Streamlit API: 使用 width="stretch" 替代 use_container_width=True
-    st.plotly_chart(fig_heat, width="stretch",key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')}")
+    latest_ts = all_ts[-1].strftime("%H%M%S")
+    st.plotly_chart(fig_heat, width="stretch",key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')_{latest_ts}}")
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
