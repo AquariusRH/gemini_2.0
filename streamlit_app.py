@@ -1927,16 +1927,17 @@ def render_qin_overall_heat_table(
     qin_df: pd.DataFrame,               # st.session_state.overall_investment_dict['QIN']
     win_odds_df: pd.DataFrame,          # st.session_state.odds_dict['WIN']
     max_minutes: int = 15               # 顯示最近 15 分鐘
-):
+) -> None:
     """
-    將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，並繪製最近 15 分鐘資金變化熱力圖
+    將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，套用 5 色階梯 (100K~500K+) 繪製熱力圖。
+    Y 軸顯示：馬號 + 最新獨贏賠率 + 最新累積總投注額。
     """
     if qin_df is None or qin_df.empty:
         st.info("尚無 QIN 投注額歷史數據。")
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏每分鐘資金變化 (1 Min Delta / 300K+ 亮色提醒)")
+    st.subheader("🔥 QIN 連贏每分鐘資金變化 (1 Min Delta / 5色資金熱力圖)")
 
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
@@ -1946,7 +1947,7 @@ def render_qin_overall_heat_table(
     # 2. 先將 15 秒採樣聚合為「每 1 分鐘最後的累積值」
     qin_1min_cum_df = qin_df_copy.resample('1min').last().ffill()
 
-    # 3. 🎯 關鍵：計算每 1 分鐘的「增量」(當前分鐘累積 - 上一分鐘累積)
+    # 3. 計算每 1 分鐘的「增量」(當前分鐘累積 - 上一分鐘累積)
     qin_1min_delta_df = qin_1min_cum_df.diff()
 
     # 第一筆數據若無前一分鐘可減，保留原值或設為 0
@@ -1986,47 +1987,55 @@ def render_qin_overall_heat_table(
         for t in heatmap_matrix_df.columns
     ]
 
-    # 8. 建構 Y 軸富文本標籤 (顯示馬號 + 賠率走勢)
+    # 8. 建構 Y 軸富文本標籤 (馬號 + 最新獨贏賠率 + 最新 QIN 累積總投注額)
     y_axis_rich_labels = []
     latest_win_series = win_odds_df.iloc[-1] if win_odds_df is not None and not win_odds_df.empty else None
-    prev_win_series = win_odds_df.iloc[-4] if win_odds_df is not None and len(win_odds_df) >= 4 else (win_odds_df.iloc[0] if win_odds_df is not None and not win_odds_df.empty else None)
-    prev_3_win_series = win_odds_df.iloc[-10] if win_odds_df is not None and len(win_odds_df) >= 10 else (win_odds_df.iloc[0] if win_odds_df is not None and not win_odds_df.empty else None)
+    latest_cum_series = qin_1min_cum_df.iloc[-1] if not qin_1min_cum_df.empty else None
 
     for h in sorted_horse_cols[::-1]:
         horse_int = int(h) if str(h).isdigit() else h
         col_key = horse_int if (latest_win_series is not None and horse_int in latest_win_series) else str(h)
         
+        # 取得最新獨贏賠率
         if latest_win_series is not None and col_key in latest_win_series:
             curr_odds = pd.to_numeric(latest_win_series[col_key], errors='coerce')
-            prev_odds = pd.to_numeric(prev_win_series[col_key], errors='coerce') if prev_win_series is not None else curr_odds
-            prev_3_odds = pd.to_numeric(prev_3_win_series[col_key], errors='coerce') if prev_3_win_series is not None else curr_odds
-            
-            rich_label = (
-                f"<b>{horse_int:02d} 號</b> <span>{curr_odds:.1f}</span> <br>"
-                f"<span style='color:#888; font-size:12px'>({prev_odds:.1f})</span> "
-                f"<span style='color:#888; font-size:12px'>(({prev_3_odds:.1f}))</span>"
-            )
+            odds_str = f"{curr_odds:.1f}"
         else:
-            rich_label = f"<b>{horse_int:02d} 號</b><br>-"
+            odds_str = "-"
+
+        # 取得最新累積總投注額
+        if latest_cum_series is not None and h in latest_cum_series:
+            latest_inv = pd.to_numeric(latest_cum_series[h], errors='coerce')
+            inv_str = f"{latest_inv:.0f}K"
+        else:
+            inv_str = "-"
             
+        # 組裝為 Y 軸 Label
+        rich_label = (
+            f"<b>{horse_int:02d} 號</b> <span style='color:#FFD700;'>{odds_str}</span><br>"
+            f"<span style='color:#AAAAAA; font-size:12px'>總投: {inv_str}</span>"
+        )
         y_axis_rich_labels.append(rich_label)
 
-    # 9. 🎯 顏色等級設定：單分鐘增量 < 300K 保持灰色，>= 300K 亮色著色
+    # 9. 5 色分級設定 (100K / 200K / 300K / 400K / 500K)
     z_min = 0.0
-    z_max = 100.0  # 單分鐘大資金上限 1M (1000K)
+    z_max = 500.0
 
     custom_colorscale = [
-        [0.0, 'rgba(40, 40, 40, 0.4)'],     # < 300K: 深灰暗色 (無顯著資金流入)
-        [0.2999, 'rgba(40, 40, 40, 0.4)'], 
-        [0.30, '#FFFF99'],                  # >= 300K: 亮黃色 (單分鐘湧入 30萬+)
-        [0.4999, '#FFCC00'],                # 300K ~ 499K
-        [0.50, '#FF9933'],                  # >= 500K: 橘色 (單分鐘湧入 50萬+)
-        [0.6999, '#FF3300'],                # 500K ~ 699K
-        [0.70, '#800080'],                  # >= 700K: 紫色 (單分鐘湧入 70萬+)
-        [1.00, '#4A0066']                   # >= 1000K+: 深紫
+        [0.0, 'rgba(40, 40, 40, 0.4)'],      # < 100K: 深灰底色
+        [0.1999, 'rgba(40, 40, 40, 0.4)'], 
+        [0.20, '#50E3C2'],                   # >= 100K: 藍綠/淺綠色
+        [0.3999, '#50E3C2'],                
+        [0.40, '#FFD700'],                   # >= 200K: 亮黃色
+        [0.5999, '#FFD700'],                
+        [0.60, '#FF9933'],                   # >= 300K: 亮橘色
+        [0.7999, '#FF9933'],                
+        [0.80, '#FF3300'],                   # >= 400K: 鮮紅色
+        [0.9999, '#FF3300'],                
+        [1.00, '#9B51E0']                    # >= 500K+: 尊爵紫色
     ]
 
-    # 10. 文字顯示：增量小於 1K (1000元) 顯示空白，其餘顯示 "+123K"
+    # 10. 文字顯示：單分鐘增量 < 1K 顯示空白，其餘顯示 "+123K"
     text_matrix = np.where(
         heatmap_matrix_df.values >= 1.0, 
         np.vectorize(lambda v: f"+{v:.0f}K")(heatmap_matrix_df.values), 
@@ -2046,8 +2055,8 @@ def render_qin_overall_heat_table(
         showscale=True,
         colorbar=dict(
             title="單分鐘資金增量",
-            tickvals=[0, 30, 50, 70, 100],
-            ticktext=['<30K', '30K', '50K', '70K', '100K+']
+            tickvals=[0, 100, 200, 300, 400, 500],
+            ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+']
         ),
         text=text_matrix,
         texttemplate="%{text}",
@@ -2055,20 +2064,21 @@ def render_qin_overall_heat_table(
         hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
     ))
 
-    chart_height = max(350, 80 + (len(sorted_horse_cols) * 38))
+    chart_height = max(350, 80 + (len(sorted_horse_cols) * 40))
 
     fig_heat.update_layout(
         height=chart_height,
-        margin=dict(t=20, b=20, l=120, r=20),
+        margin=dict(t=20, b=20, l=130, r=20),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         dragmode=False,
         font=dict(color="white"),
         xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
-        yaxis=dict(showgrid=False, title="馬號 / 賠率", fixedrange=True, tickfont=dict(size=14))
+        yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13))
     )
 
-    st.plotly_chart(fig_heat, use_container_width=True,key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')}")
+    # 適應新版 Streamlit API: 使用 width="stretch" 替代 use_container_width=True
+    st.plotly_chart(fig_heat, width="stretch",key=f"qin_table_{race_no}_{time_now.strftime('%H%M%S')}")
 # ==================== 4. 主介面邏輯 ====================
 
 # --- 輸入區 ---
