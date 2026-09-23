@@ -2072,7 +2072,6 @@ def render_qin_overall_heat_table(
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         dragmode=False,
-        font=dict(color="white"),
         xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
         yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13))
     )
