@@ -1926,7 +1926,7 @@ def plot_racing_monitor_dashboard():
 def render_qin_overall_heat_table(
     qin_df: pd.DataFrame,               # st.session_state.overall_investment_dict['QIN']
     win_odds_df: pd.DataFrame,          # st.session_state.odds_dict['WIN']
-    max_minutes: int = 10               # 🎯 修改 1：預設展示 10 格 (10 分鐘)
+    max_minutes: int = 10               # 展示 10 格 (10 分鐘)
 ) -> None:
     """
     將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，並透過 Plotly Frames + Sliders 
@@ -1937,7 +1937,7 @@ def render_qin_overall_heat_table(
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏每分鐘資金變化 (時間軸回溯 / 10格高對比版)")
+    st.subheader("🔥 QIN 連贏每分鐘資金變化 (時間軸回溯 / 10格大字高對比版)")
 
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
@@ -1991,20 +1991,20 @@ def render_qin_overall_heat_table(
         )
         y_axis_rich_labels.append(rich_label)
 
-    # 🎯 修改 3：高對比度 5 色階梯色系 (藍 -> 綠 -> 黃 -> 紅 -> 紫)
+    # 高對比度 5 色階梯色系 (藍 -> 綠 -> 黃 -> 紅 -> 紫)
     z_min, z_max = 0.0, 500.0
     custom_colorscale = [
         [0.0, 'rgba(40, 40, 40, 0.4)'],      # < 100K: 深灰底色
         [0.1999, 'rgba(40, 40, 40, 0.4)'], 
-        [0.20, '#00D2FF'],                   # >= 100K: 冰藍色 (Cyan)
+        [0.20, '#00D2FF'],                   # >= 100K: 冰藍色
         [0.3999, '#00D2FF'],                
-        [0.40, '#00E676'],                   # >= 200K: 鮮綠色 (Neon Green)
+        [0.40, '#00E676'],                   # >= 200K: 鮮綠色
         [0.5999, '#00E676'],                
-        [0.60, '#FFEA00'],                   # >= 300K: 檸檬黃 (Bright Yellow)
+        [0.60, '#FFEA00'],                   # >= 300K: 檸檬黃
         [0.7999, '#FFEA00'],                
-        [0.80, '#FF1744'],                   # >= 400K: 鮮紅色 (Bright Red)
+        [0.80, '#FF1744'],                   # >= 400K: 鮮紅色
         [0.9999, '#FF1744'],                
-        [1.00, '#D500F9']                    # >= 500K+: 電光紫色 (Neon Purple)
+        [1.00, '#D500F9']                    # >= 500K+: 電光紫色
     ]
 
     # 5. 構建時間軸動畫幀 (Frames) - 每次切片 10 格
@@ -2012,7 +2012,6 @@ def render_qin_overall_heat_table(
     start_idx = min(max_minutes - 1, len(all_ts) - 1)
 
     for i in range(start_idx, len(all_ts)):
-        # 截取截至時間點 i 往前推 max_minutes (10分鐘) 的數據片段
         frame_sub_df = qin_1min_delta_df.iloc[max(0, i - max_minutes + 1) : i + 1]
         matrix_df = frame_sub_df[sorted_horse_cols].T.iloc[::-1]
 
@@ -2036,7 +2035,8 @@ def render_qin_overall_heat_table(
                 y=y_axis_rich_labels,
                 text=text_matrix,
                 texttemplate="%{text}",
-                textfont={"size": 11},
+                # 🎯 修改處：放大格內字體至 15px 加粗
+                textfont={"size": 15, "family": "Arial Black, sans-serif"},
                 hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
             )],
             name=ts_label
@@ -2049,7 +2049,7 @@ def render_qin_overall_heat_table(
     # 6. 設定預設展示最後一幀 (最新時間)
     initial_frame = frames[-1]
 
-    # 🎯 修改 2：計算右側編號 (#1 至 #N)
+    # 右側編號 (#1 至 #N)
     right_axis_ticks = list(range(num_horses))
     right_axis_labels = [f"#{num_horses - i}" for i in range(num_horses)]
 
@@ -2071,20 +2071,21 @@ def render_qin_overall_heat_table(
             ),
             text=initial_frame.data[0].text,
             texttemplate="%{text}",
-            textfont={"size": 11},
+            # 🎯 修改處：預設圖層格內字體同步放大至 15px 加粗
+            textfont={"size": 15, "family": "Arial Black, sans-serif"},
             hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
         )],
         layout=go.Layout(
-            height=max(480, 180 + (num_horses * 40)),
-            margin=dict(t=30, b=100, l=130, r=60),  # 右側留下 60px 空間給右 Y 軸編號
+            height=max(480, 180 + (num_horses * 42)), # 稍微加高每一列，確保大字體不擁擠
+            margin=dict(t=30, b=100, l=130, r=60),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             dragmode=False,
             
-            # 左側 Y 軸 (馬號 / 賠率 / 總投)
+            # 左側 Y 軸
             yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13)),
             
-            # 🎯 修改 2：右側 Y 軸 (編號 #1 ~ #N)
+            # 右側 Y 軸 (編號 #1 ~ #N)
             yaxis2=dict(
                 title="序號",
                 overlaying='y',
