@@ -2085,17 +2085,15 @@ def render_qin_overall_heat_table(
             # 左側 Y 軸
             yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13)),
             
-            # 右側 Y 軸 (編號 #1 ~ #N)
+            # 🎯 右側 Y 軸：設定 matches='y' 自動同步與鏡像左側 Y 軸
             yaxis2=dict(
-                title="序號",
+                title="馬號 / 賠率 / 總投注額",
                 overlaying='y',
                 side='right',
+                matches='y',            # 核心：完全跟隨與同步左 Y 軸 (包含標籤與順序)
                 showgrid=False,
-                tickmode='array',
-                tickvals=right_axis_ticks,
-                ticktext=right_axis_labels,
                 fixedrange=True,
-                tickfont=dict(size=12)
+                tickfont=dict(size=13)
             ),
             
             xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
