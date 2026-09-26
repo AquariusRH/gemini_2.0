@@ -1937,7 +1937,7 @@ def render_qin_overall_heat_table(
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏每分鐘資金變化 (時間軸回溯 / 10格大字高對比版)")
+    st.subheader("🔥 QIN 連贏每分鐘資金變化 (雙側 Y 軸強制顯示版)")
 
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
@@ -1973,7 +1973,7 @@ def render_qin_overall_heat_table(
 
     num_horses = len(sorted_horse_cols)
 
-    # 4. 左 Y 軸富文本標籤 (馬號 + 最新獨贏賠率 + 最新累積總投注額)
+    # 4. Y 軸富文本標籤 (馬號 + 最新獨贏賠率 + 最新累積總投注額)
     y_axis_rich_labels = []
     latest_win_series = win_odds_df.iloc[-1] if win_odds_df is not None and not win_odds_df.empty else None
     latest_cum_series = qin_1min_cum_df.iloc[-1] if not qin_1min_cum_df.empty else None
@@ -2007,7 +2007,7 @@ def render_qin_overall_heat_table(
         [1.00, '#D500F9']                    # >= 500K+: 電光紫色
     ]
 
-    # 5. 構建時間軸動畫幀 (Frames) - 每次切片 10 格
+    # 5. 構建時間軸動畫幀 (Frames)
     frames = []
     start_idx = min(max_minutes - 1, len(all_ts) - 1)
 
@@ -2035,7 +2035,6 @@ def render_qin_overall_heat_table(
                 y=y_axis_rich_labels,
                 text=text_matrix,
                 texttemplate="%{text}",
-                # 🎯 修改處：放大格內字體至 15px 加粗
                 textfont={"size": 15, "family": "Arial Black, sans-serif"},
                 hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
             )],
@@ -2046,38 +2045,46 @@ def render_qin_overall_heat_table(
         st.info("數據不足以繪製時間軸。")
         return
 
-    # 6. 設定預設展示最後一幀 (最新時間)
+    # 6. 主熱力圖與預設顯示
     initial_frame = frames[-1]
 
-    # 右側編號 (#1 至 #N)
-    right_axis_ticks = list(range(num_horses))
-    right_axis_labels = [f"#{num_horses - i}" for i in range(num_horses)]
+    heatmap_trace = go.Heatmap(
+        z=initial_frame.data[0].z,
+        x=initial_frame.data[0].x,
+        y=initial_frame.data[0].y,
+        ygap=3,
+        xgap=2,
+        zmin=z_min,
+        zmax=z_max,
+        colorscale=custom_colorscale,
+        showscale=True,
+        colorbar=dict(
+            title="單分鐘資金增量",
+            tickvals=[0, 100, 200, 300, 400, 500],
+            ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+']
+        ),
+        text=initial_frame.data[0].text,
+        texttemplate="%{text}",
+        textfont={"size": 15, "family": "Arial Black, sans-serif"},
+        hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
+    )
+
+    # 🎯 核心修復：建立一個綁定到 yaxis='y2' 的完全透明 Dummy Trace，強制讓 Plotly 渲染右 Y 軸
+    dummy_y2_trace = go.Scatter(
+        x=[initial_frame.data[0].x[0]] * num_horses,
+        y=y_axis_rich_labels,
+        yaxis='y2',
+        mode='markers',
+        marker=dict(opacity=0, size=0),
+        showlegend=False,
+        hoverinfo='skip'
+    )
 
     fig_heat = go.Figure(
-        data=[go.Heatmap(
-            z=initial_frame.data[0].z,
-            x=initial_frame.data[0].x,
-            y=initial_frame.data[0].y,
-            ygap=3,
-            xgap=2,
-            zmin=z_min,
-            zmax=z_max,
-            colorscale=custom_colorscale,
-            showscale=True,
-            colorbar=dict(
-                title="單分鐘資金增量",
-                tickvals=[0, 100, 200, 300, 400, 500],
-                ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+']
-            ),
-            text=initial_frame.data[0].text,
-            texttemplate="%{text}",
-            # 🎯 修改處：預設圖層格內字體同步放大至 15px 加粗
-            textfont={"size": 15, "family": "Arial Black, sans-serif"},
-            hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
-        )],
+        data=[heatmap_trace, dummy_y2_trace],
         layout=go.Layout(
-            height=max(480, 180 + (num_horses * 42)), # 稍微加高每一列，確保大字體不擁擠
-            margin=dict(t=30, b=100, l=130, r=60),
+            height=max(480, 180 + (num_horses * 42)),
+            margin=dict(t=30, b=100, l=130, r=130), # 雙側預留 130px 邊距
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             dragmode=False,
@@ -2085,12 +2092,12 @@ def render_qin_overall_heat_table(
             # 左側 Y 軸
             yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13)),
             
-            # 🎯 右側 Y 軸：設定 matches='y' 自動同步與鏡像左側 Y 軸
+            # 右側 Y 軸：與左軸完全相同且鏡像對齊
             yaxis2=dict(
                 title="馬號 / 賠率 / 總投注額",
                 overlaying='y',
                 side='right',
-                matches='y',            # 核心：完全跟隨與同步左 Y 軸 (包含標籤與順序)
+                matches='y',
                 showgrid=False,
                 fixedrange=True,
                 tickfont=dict(size=13)
