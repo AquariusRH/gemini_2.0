@@ -3088,7 +3088,7 @@ if monitoring_on:
                 render_qin_overall_heat_table(
                     qin_df=st.session_state.overall_investment_dict.get('QIN'),
                     win_odds_df=st.session_state.odds_dict.get('WIN'),
-                    max_minutes=15  # 自動拉取最近 15 分鐘的數據 (共 15 個欄位)
+                    max_minutes=10  # 自動拉取最近 15 分鐘的數據 (共 15 個欄位)
                 )
                 #st.write(st.session_state.overall_investment_dict.get('QIN'))
                 
