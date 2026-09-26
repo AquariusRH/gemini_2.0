@@ -1986,7 +1986,7 @@ def render_qin_overall_heat_table(
         inv_str = f"{pd.to_numeric(latest_cum_series[h], errors='coerce'):.0f}K" if (latest_cum_series is not None and h in latest_cum_series) else "-"
             
         rich_label = (
-            f"<b>{horse_int:02d} 號</b> <span style='color:#FFD700;'>{odds_str}</span><br>"
+            f"<b>{horse_int:02d} 號</b> <span>{odds_str}</span><br>"
             f"<span font-size:12px'>總投: {inv_str}</span>"
         )
         y_axis_rich_labels.append(rich_label)
