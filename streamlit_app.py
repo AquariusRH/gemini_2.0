@@ -1923,16 +1923,10 @@ def plot_racing_monitor_dashboard():
     #with c2:
         #st.plotly_chart(fig_inv, width='stretch', config={'displayModeBar': False})
 
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import streamlit as st
-from datetime import datetime
-
 def render_qin_overall_heat_table(
     qin_df: pd.DataFrame,               # st.session_state.overall_investment_dict['QIN']
     win_odds_df: pd.DataFrame,          # st.session_state.odds_dict['WIN']
-    max_minutes: int = 15               # 每次展示最近 15 分鐘的滑動視窗
+    max_minutes: int = 10               # 🎯 修改 1：預設展示 10 格 (10 分鐘)
 ) -> None:
     """
     將累積 QIN 數據轉為「每 1 分鐘資金增量 (Delta)」，並透過 Plotly Frames + Sliders 
@@ -1943,7 +1937,7 @@ def render_qin_overall_heat_table(
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏每分鐘資金變化 (時間軸回溯版)")
+    st.subheader("🔥 QIN 連贏每分鐘資金變化 (時間軸回溯 / 10格高對比版)")
 
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
@@ -1977,7 +1971,9 @@ def render_qin_overall_heat_table(
     else:
         sorted_horse_cols = sorted(horse_cols, key=lambda h: int(h) if str(h).isdigit() else str(h))
 
-    # 4. Y 軸固定標籤 (馬號 + 最新獨贏賠率 + 最新累積總投注額)
+    num_horses = len(sorted_horse_cols)
+
+    # 4. 左 Y 軸富文本標籤 (馬號 + 最新獨贏賠率 + 最新累積總投注額)
     y_axis_rich_labels = []
     latest_win_series = win_odds_df.iloc[-1] if win_odds_df is not None and not win_odds_df.empty else None
     latest_cum_series = qin_1min_cum_df.iloc[-1] if not qin_1min_cum_df.empty else None
@@ -1990,34 +1986,33 @@ def render_qin_overall_heat_table(
         inv_str = f"{pd.to_numeric(latest_cum_series[h], errors='coerce'):.0f}K" if (latest_cum_series is not None and h in latest_cum_series) else "-"
             
         rich_label = (
-            f"<b>{horse_int:02d} 號</b>{odds_str}</span><br>"
+            f"<b>{horse_int:02d} 號</b> <span style='color:#FFD700;'>{odds_str}</span><br>"
             f"<span style='color:#AAAAAA; font-size:12px'>總投: {inv_str}</span>"
         )
         y_axis_rich_labels.append(rich_label)
 
-    # 5. 5 色分級設定 (100K / 200K / 300K / 400K / 500K)
+    # 🎯 修改 3：高對比度 5 色階梯色系 (藍 -> 綠 -> 黃 -> 紅 -> 紫)
     z_min, z_max = 0.0, 500.0
     custom_colorscale = [
         [0.0, 'rgba(40, 40, 40, 0.4)'],      # < 100K: 深灰底色
         [0.1999, 'rgba(40, 40, 40, 0.4)'], 
-        [0.20, '#50E3C2'],                   # >= 100K: 藍綠/淺綠色
-        [0.3999, '#50E3C2'],                
-        [0.40, '#FFD700'],                   # >= 200K: 亮黃色
-        [0.5999, '#FFD700'],                
-        [0.60, '#FF9933'],                   # >= 300K: 亮橘色
-        [0.7999, '#FF9933'],                
-        [0.80, '#FF3300'],                   # >= 400K: 鮮紅色
-        [0.9999, '#FF3300'],                
-        [1.00, '#9B51E0']                    # >= 500K+: 尊爵紫色
+        [0.20, '#00D2FF'],                   # >= 100K: 冰藍色 (Cyan)
+        [0.3999, '#00D2FF'],                
+        [0.40, '#00E676'],                   # >= 200K: 鮮綠色 (Neon Green)
+        [0.5999, '#00E676'],                
+        [0.60, '#FFEA00'],                   # >= 300K: 檸檬黃 (Bright Yellow)
+        [0.7999, '#FFEA00'],                
+        [0.80, '#FF1744'],                   # >= 400K: 鮮紅色 (Bright Red)
+        [0.9999, '#FF1744'],                
+        [1.00, '#D500F9']                    # >= 500K+: 電光紫色 (Neon Purple)
     ]
 
-    # 6. 🎯 構建時間軸動畫幀 (Frames)
+    # 5. 構建時間軸動畫幀 (Frames) - 每次切片 10 格
     frames = []
-    # 至少確保有數據可顯示，從第一個可集滿/可顯示的時間點開始生成幀
     start_idx = min(max_minutes - 1, len(all_ts) - 1)
 
     for i in range(start_idx, len(all_ts)):
-        # 截取截至時間點 i 往前推 max_minutes 分鐘的數據片段
+        # 截取截至時間點 i 往前推 max_minutes (10分鐘) 的數據片段
         frame_sub_df = qin_1min_delta_df.iloc[max(0, i - max_minutes + 1) : i + 1]
         matrix_df = frame_sub_df[sorted_horse_cols].T.iloc[::-1]
 
@@ -2051,8 +2046,12 @@ def render_qin_overall_heat_table(
         st.info("數據不足以繪製時間軸。")
         return
 
-    # 7. 設定預設展示最後一幀 (即最新時間)
+    # 6. 設定預設展示最後一幀 (最新時間)
     initial_frame = frames[-1]
+
+    # 🎯 修改 2：計算右側編號 (#1 至 #N)
+    right_axis_ticks = list(range(num_horses))
+    right_axis_labels = [f"#{num_horses - i}" for i in range(num_horses)]
 
     fig_heat = go.Figure(
         data=[go.Heatmap(
@@ -2076,17 +2075,33 @@ def render_qin_overall_heat_table(
             hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
         )],
         layout=go.Layout(
-            height=max(480, 180 + (len(sorted_horse_cols) * 40)),
-            margin=dict(t=30, b=100, l=130, r=20),  # 底部留下 100px 空間容納 Slider
+            height=max(480, 180 + (num_horses * 40)),
+            margin=dict(t=30, b=100, l=130, r=60),  # 右側留下 60px 空間給右 Y 軸編號
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             dragmode=False,
-            xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
+            
+            # 左側 Y 軸 (馬號 / 賠率 / 總投)
             yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13)),
             
-            # 🎯 8. 設定 Plotly 時間軸滑塊 (Sliders)
+            # 🎯 修改 2：右側 Y 軸 (編號 #1 ~ #N)
+            yaxis2=dict(
+                title="序號",
+                overlaying='y',
+                side='right',
+                showgrid=False,
+                tickmode='array',
+                tickvals=right_axis_ticks,
+                ticktext=right_axis_labels,
+                fixedrange=True,
+                tickfont=dict(size=12)
+            ),
+            
+            xaxis=dict(showticklabels=True, showgrid=False, zeroline=False, fixedrange=True, tickangle=0),
+            
+            # 時間軸滑塊配置
             sliders=[{
-                "active": len(frames) - 1, # 預設指針停在最新的時間
+                "active": len(frames) - 1,
                 "currentvalue": {
                     "prefix": "🕒 回溯截至時間: ",
                     "font": {"size": 14, "color": "#FFD700"},
@@ -2095,7 +2110,6 @@ def render_qin_overall_heat_table(
                 "pad": {"t": 40, "b": 10},
                 "steps": [
                     {
-                        # "redraw": True 為關鍵：確保拖動時重新渲染顏色與文字矩陣
                         "args": [[f.name], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}],
                         "label": f.name,
                         "method": "animate",
