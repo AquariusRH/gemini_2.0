@@ -1937,7 +1937,7 @@ def render_qin_overall_heat_table(
         return
 
     st.markdown("---")
-    st.subheader("🔥 QIN 連贏每分鐘資金變化 (雙側 Y 軸強制顯示版)")
+    st.subheader("🔥 QIN 連贏每分鐘資金變化 (右軸與色帶分離版)")
 
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
@@ -1991,7 +1991,7 @@ def render_qin_overall_heat_table(
         )
         y_axis_rich_labels.append(rich_label)
 
-    # 高對比度 5 色階梯色系 (藍 -> 綠 -> 黃 -> 紅 -> 紫)
+    # 高對比度 5 色階梯色系
     z_min, z_max = 0.0, 500.0
     custom_colorscale = [
         [0.0, 'rgba(40, 40, 40, 0.4)'],      # < 100K: 深灰底色
@@ -2061,7 +2061,9 @@ def render_qin_overall_heat_table(
         colorbar=dict(
             title="單分鐘資金增量",
             tickvals=[0, 100, 200, 300, 400, 500],
-            ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+']
+            ticktext=['<100K', '100K', '200K', '300K', '400K', '500K+'],
+            x=1.18,      # 🎯 修改處：將 Colorbar 向右移動至 x=1.18，避開右側 Y 軸文字
+            xpad=10
         ),
         text=initial_frame.data[0].text,
         texttemplate="%{text}",
@@ -2069,7 +2071,7 @@ def render_qin_overall_heat_table(
         hovertemplate="時間: %{x}<br>馬號: %{y}<br>單分鐘新增: %{z:.1f}K<extra></extra>"
     )
 
-    # 🎯 核心修復：建立一個綁定到 yaxis='y2' 的完全透明 Dummy Trace，強制讓 Plotly 渲染右 Y 軸
+    # 觸發右側 Y 軸顯示的 Dummy Trace
     dummy_y2_trace = go.Scatter(
         x=[initial_frame.data[0].x[0]] * num_horses,
         y=y_axis_rich_labels,
@@ -2084,7 +2086,8 @@ def render_qin_overall_heat_table(
         data=[heatmap_trace, dummy_y2_trace],
         layout=go.Layout(
             height=max(480, 180 + (num_horses * 42)),
-            margin=dict(t=30, b=100, l=130, r=130), # 雙側預留 130px 邊距
+            # 🎯 修改處：將右邊距（r）從 130 加大至 220，確保 Colorbar 移動後不會被切掉
+            margin=dict(t=30, b=100, l=130, r=220),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             dragmode=False,
@@ -2092,9 +2095,9 @@ def render_qin_overall_heat_table(
             # 左側 Y 軸
             yaxis=dict(showgrid=False, title="馬號 / 賠率 / 總投注額", fixedrange=True, tickfont=dict(size=13)),
             
-            # 右側 Y 軸：與左軸完全相同且鏡像對齊
+            # 右側 Y 軸
             yaxis2=dict(
-                title="馬號 / 賠率 / 總投注額",
+                title="",               # 清空右標題，避免文字重複干擾
                 overlaying='y',
                 side='right',
                 matches='y',
