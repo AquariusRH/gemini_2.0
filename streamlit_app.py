@@ -1950,7 +1950,8 @@ def render_qin_overall_heat_table(
         time_str = "🏁 已開跑" if seconds_left <= 0 else f"⏳ 離開跑 {int(seconds_left // 60)} 分"
     else:
         time_str = "未載入"
-
+    
+    last_upd = st.session_state.last_update.strftime('%H:%M:%S') if st.session_state.get('last_update') else "N/A"
     st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
