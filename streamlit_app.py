@@ -1938,7 +1938,18 @@ def render_qin_overall_heat_table(
 
     st.markdown("---")
     st.subheader("🔥 QIN 連贏每分鐘資金變化 (右軸與色帶分離版)")
-
+        # --- 1. 時間處理與合併顯示 ---
+    HK_TZ = timezone(timedelta(hours=8))
+    now = datetime.now(HK_TZ)
+    
+    # 獲取開跑倒數
+    post_time_raw = st.session_state.post_time_dict[race_no]
+    if post_time_raw:
+        post_time = post_time_raw.replace(tzinfo=HK_TZ) if post_time_raw.tzinfo is None else post_time_raw
+        seconds_left = (post_time - now).total_seconds()
+        time_str = "🏁 已開跑" if seconds_left <= 0 else f"⏳ 離開跑 {int(seconds_left // 60)} 分"
+    else:
+        time_str = "未載入"
     # 1. 確保 Index 為 DatetimeIndex
     qin_df_copy = qin_df.copy()
     if not isinstance(qin_df_copy.index, pd.DatetimeIndex):
@@ -3083,7 +3094,7 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
-
+            
             if show_qin_overall_heat_table:
                 render_qin_overall_heat_table(
                     qin_df=st.session_state.overall_investment_dict.get('QIN'),
