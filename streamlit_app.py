@@ -2895,8 +2895,25 @@ else:
 
 methodlist = ['WIN', 'PLA', 'QIN', 'QPL'] # 簡化預設
 time_delay = 10
-if len(st.session_state.race_dataframes[race_no]['馬名'])<7:
-    print_list = ['WIN&QIN','PLA']
+# ==================== 2. 手動選擇退出馬匹（放在 race_card 後） ====================
+if race_no in st.session_state.race_dataframes:
+    raw_horse_count = len(st.session_state.race_dataframes[race_no])
+else:
+    raw_horse_count = 12  # 讀取不到排位表時的備用預設值
+
+# ==================== 2. 手動選擇/覆蓋參賽馬匹數量 ====================
+actual_horse_count = st.number_input(
+    "實際參賽馬匹數量",
+    min_value=1,
+    max_value=20,
+    value=int(raw_horse_count),
+    step=1,
+    key=f"horse_count_input_{race_no}"
+)
+
+# ==================== 3. 根據「實際數量」決定 print_list ====================
+if actual_horse_count < 7:
+    print_list = ['WIN&QIN', 'PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
 top_list = ['QIN']
