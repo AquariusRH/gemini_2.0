@@ -2886,6 +2886,7 @@ if race_no in st.session_state.race_dataframes:
     pt = st.session_state.post_time_dict.get(race_no)
     pt_str = pt.strftime("%H:%M") if pt else "--:--"
     st.info(f"📍 {place} 第 {race_no} 場 | 🕒 開跑: {pt_str}")
+    raw_horse_count = len(st.session_state.race_dataframes[race_no])
     with st.expander("查看排位表", expanded=False):
         st.dataframe(st.session_state.race_dataframes[race_no], width='stretch')
         # 放在排位表下方
