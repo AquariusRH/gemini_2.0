@@ -2901,8 +2901,8 @@ if race_no in st.session_state.race_dataframes:
 else:
     raw_horse_count = 12  # 讀取不到排位表時的備用預設值
 
-# ==================== 2. 手動選擇/覆蓋參賽馬匹數量 ====================
-actual_horse_count = st.number_input(
+# 2. 將 st.number_input 的回傳值賦予給 horse_no
+horse_no = st.number_input(
     "實際參賽馬匹數量",
     min_value=1,
     max_value=20,
@@ -2911,8 +2911,8 @@ actual_horse_count = st.number_input(
     key=f"horse_count_input_{race_no}"
 )
 
-# ==================== 3. 根據「實際數量」決定 print_list ====================
-if actual_horse_count < 7:
+# 3. 關鍵：判斷式必須使用手動覆蓋後的 horse_no，而不是舊的 len(...)
+if horse_no < 7:
     print_list = ['WIN&QIN', 'PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
