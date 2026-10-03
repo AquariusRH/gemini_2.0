@@ -2888,36 +2888,30 @@ if race_no in st.session_state.race_dataframes:
     st.info(f"📍 {place} 第 {race_no} 場 | 🕒 開跑: {pt_str}")
     with st.expander("查看排位表", expanded=False):
         st.dataframe(st.session_state.race_dataframes[race_no], width='stretch')
+        # 放在排位表下方
+        horse_count = st.number_input(
+            "實際參賽馬匹數量",
+            min_value=1,
+            max_value=20,
+            value=int(raw_horse_count),
+            step=1,
+            key=f"horse_count_input_{race_no}"
+        )
 else:
     st.warning("找不到此場次資料，請確認日期與場地。")
+    horse_count = 12
 
 # ==================== 5. 監控循環邏輯 ====================
 
 methodlist = ['WIN', 'PLA', 'QIN', 'QPL'] # 簡化預設
 time_delay = 10
-# ==================== 2. 手動選擇退出馬匹（放在 race_card 後） ====================
-if race_no in st.session_state.race_dataframes:
-    raw_horse_count = len(st.session_state.race_dataframes[race_no])
-else:
-    raw_horse_count = 12  # 讀取不到排位表時的備用預設值
-
-# 2. 將 st.number_input 的回傳值賦予給 horse_no
-horse_count = st.number_input(
-    "實際參賽馬匹數量",
-    min_value=1,
-    max_value=20,
-    value=int(raw_horse_count),
-    step=1,
-    key=f"horse_count_input_{race_no}"
-)
 
 # 3. 關鍵：判斷式必須使用手動覆蓋後的 horse_no，而不是舊的 len(...)
 if horse_count < 7:
     print_list = ['WIN&QIN', 'PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
-st.write(horse_count)
-st.write(print_list)
+
 top_list = ['QIN']
 methodCHlist = ['連贏']
 for method in methodlist:
