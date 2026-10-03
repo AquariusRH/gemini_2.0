@@ -2916,6 +2916,7 @@ if actual_horse_count < 7:
     print_list = ['WIN&QIN', 'PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
+st.write(print_list)
 top_list = ['QIN']
 methodCHlist = ['連贏']
 for method in methodlist:
