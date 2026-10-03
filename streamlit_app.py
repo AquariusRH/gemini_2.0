@@ -2902,7 +2902,7 @@ else:
     raw_horse_count = 12  # 讀取不到排位表時的備用預設值
 
 # 2. 將 st.number_input 的回傳值賦予給 horse_no
-horse_no = st.number_input(
+horse_count = st.number_input(
     "實際參賽馬匹數量",
     min_value=1,
     max_value=20,
@@ -2912,11 +2912,11 @@ horse_no = st.number_input(
 )
 
 # 3. 關鍵：判斷式必須使用手動覆蓋後的 horse_no，而不是舊的 len(...)
-if horse_no < 7:
+if horse_count < 7:
     print_list = ['WIN&QIN', 'PLA']
 else:
     print_list = ['WIN&QIN', 'PLA&QPL']
-st.write(actual_horse_count)
+st.write(horse_count)
 st.write(print_list)
 top_list = ['QIN']
 methodCHlist = ['連贏']
