@@ -2994,6 +2994,7 @@ if monitoring_on:
             #plot_racing_monitor_dashboard()
             # B. 實時預測排名
             st.markdown("### 🤖 實時資金流綜合預測排名")
+            st.markdown(f"### {status_icon} {time_str} ｜ ⏱️ 最後同步時間：`{last_update_str}`")
             prediction_df = calculate_smart_score(race_no)
 
             if not prediction_df.empty:
