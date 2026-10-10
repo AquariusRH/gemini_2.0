@@ -1659,6 +1659,7 @@ def print_henery_model(gamma=1.18):
         # --- 8. 新增：全寬熱力圖趨勢 ---
         st.markdown("---") # 分割線
         st.subheader("🔥 歷史熱度掃描 (Heatmap)")
+        st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
         if win_df is not None:
             # 排除非馬號的 column (如果有)，並排序
             latest_win_series = win_df.iloc[-1]
