@@ -2160,7 +2160,8 @@ with st.sidebar:
     
     # 監控開關
     monitoring_on = st.toggle("啟動即時監控", value=False)
-    keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", "bubble_key","save_db","show_qin_overall_heat_table","show_money_table"]
+    keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", 
+                 "bubble_key","save_db","show_qin_overall_heat_table","show_money_table","show_moneyflow_alerts","show_prediction_table"]
     if st.button("重置所有數據"):
         for key in list(st.session_state.keys()):
             if key not in keep_keys:
@@ -2171,6 +2172,8 @@ with st.sidebar:
     show_bar = st.toggle("📊 顯示長條圖", key="show_bar", value=False)
     show_move_bar = st.toggle("📊 顯示移動長條圖", key="show_move_bar", value=True)
     show_money_table = st.toggle("顯示資金表格", key="show_money_table", value=True)
+    show_moneyflow_alerts = st.toggle("顯示資金異常表格", key="show_moneyflow_alerts", value=True)
+    show_prediction_table = st.toggle("顯示綜合評分表格", key="show_prediction_table", value=False)
     show_top = st.toggle("🏆 顯示連贏賠率排名", key="show_top", value=True)
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
     save_db = st.toggle("儲存database", key="save_db", value=False)
@@ -2869,7 +2872,105 @@ def calculate_smart_score_static(race_no):
     df = df[final_cols].sort_values('TotalScore', ascending=False)
     
     return df
+    
+def print_high_moneyflow_alerts(race_no, minutes, time_str):
+    """
+    計算 smart score，更新異常大額資金流警示 (MoneyFlow > 500)，並顯示 expander 表格
+    """
+    prediction_df = calculate_smart_score(race_no)
+    
+    if prediction_df.empty:
+        st.warning(f"第 {race_no} 場目前沒有預測資料")
+        return
+    
+    # ----------------------------------------------------
+    # 1. 處理異常大額資金流警示 (MoneyFlow > 500)
+    # ----------------------------------------------------
+    high_flow_df = prediction_df[prediction_df['MoneyFlow'] > 500]
+    
+    if not high_flow_df.empty:
+        new_alerts = []
+        for horse_no, row in high_flow_df.iterrows():
+            new_alerts.append({
+                "分鐘": minutes,
+                "時間": time_str,
+                "馬號": horse_no,
+                "當刻賠率": f"{row['Odds']:.1f}" if pd.notna(row['Odds']) else "-",
+                "moneyflow": round(row['MoneyFlow'], 1)
+            })
+        new_alerts_df = pd.DataFrame(new_alerts)
+        
+        # 合併並去重（保留 moneyflow 最大的那一筆）
+        combined_df = pd.concat(
+            [st.session_state.high_moneyflow_alerts, new_alerts_df],
+            ignore_index=True
+        )
+        
+        st.session_state.high_moneyflow_alerts = (
+            combined_df
+            .sort_values(by='moneyflow', ascending=False)
+            .drop_duplicates(subset=['時間', '馬號'], keep='first')
+            .reset_index(drop=True)
+        )
+    
+    # ----------------------------------------------------
+    # 2. 顯示警示區塊
+    # ----------------------------------------------------
+    with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 500)", expanded=False):
+        if st.session_state.high_moneyflow_alerts.empty:
+            st.info("目前尚無大於 500 的資金流紀錄。")
+        else:
+            display_alerts = (
+                st.session_state.high_moneyflow_alerts
+                .sort_values(by="分鐘", ascending=True)
+                .copy()
+            )
+            display_alerts["moneyflow"] = display_alerts["moneyflow"].apply(lambda x: f"{x:.1f}")
+            
+            st.table(
+                display_alerts[["時間", "馬號", "當刻賠率", "moneyflow"]],
+                width='stretch',
+                hide_index=True
+            )
 
+def print_prediction_table(race_no, title="### 🤖 實時資金流綜合預測排名"):
+    """
+    計算 smart score 並顯示主要預測表格
+    欄位：馬名、馬齡、騎師、排位、練馬師、當前賠率、近期資金流
+    """
+    prediction_df = calculate_smart_score(race_no)
+    
+    if prediction_df.empty:
+        st.warning(f"第 {race_no} 場目前沒有預測資料")
+        return
+    
+    display_df = prediction_df[['馬名', '馬齡', '騎師', '排位', '練馬師', 'Odds', 'MoneyFlow']].copy()
+    display_df.columns = ['馬名', '馬齡', '騎師', '排位', '練馬師', '當前賠率', '近期資金流']
+    
+    display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
+    display_df['近期資金流'] = display_df['近期資金流'].apply(lambda x: f"{x:.1f}k")
+    
+    # 樣式
+    st.markdown("""
+        <style>
+        .stTable td {
+            white-space: nowrap !important;
+            vertical-align: middle;
+        }
+        .stTable th {
+            white-space: normal !important;
+            min-width: 60px;
+            font-size: 14px !important;
+            line-height: 1.1;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    if title:
+        st.markdown(f"### {title}")
+    
+    st.table(display_df.style.hide(axis='index'))
+    
 def calculate_money_flow_only(race_no):
     """
     只計算並回傳 Money Flow 相關資料，不計算任何 Static Score。
@@ -3116,87 +3217,13 @@ if monitoring_on:
                 print_plotly_advanced_bar(race_no,print_list)
             #plot_racing_monitor_dashboard()
             # B. 實時預測排名
-            st.markdown("### 🤖 實時資金流綜合預測排名")
             st.markdown(f"### {status_icon} {time_str} ｜ ⏱️ 最後同步時間：`{last_update_str}`")
-            prediction_df = calculate_smart_score(race_no)
 
-            if not prediction_df.empty:
-                high_flow_df = prediction_df[prediction_df['MoneyFlow'] > 500]
-                
-                if not high_flow_df.empty:
-                    new_alerts = []
-                    for horse_no, row in high_flow_df.iterrows():
-                        new_alerts.append({
-                            "分鐘": minutes,
-                            "時間": time_str,
-                            "馬號": horse_no,
-                            "當刻賠率": f"{row['Odds']:.1f}" if pd.notna(row['Odds']) else "-",
-                            "moneyflow": round(row['MoneyFlow'], 1)
-                        })
-                    new_alerts_df = pd.DataFrame(new_alerts)
-                    
-                    # 1. 直接將新資料合併到既有的歷史紀錄中
-                    combined_df = pd.concat([st.session_state.high_moneyflow_alerts, new_alerts_df], ignore_index=True)
-                    
-                    # 2. 核心處理：
-                    #    - 先按 moneyflow 降序排序（大的在前）
-                    #    - 然後針對「時間」和「馬號」這兩個欄位去重，並保留第一個（即最大的那個）
-                    st.session_state.high_moneyflow_alerts = (
-                        combined_df.sort_values(by='moneyflow', ascending=False)
-                                   .drop_duplicates(subset=['時間','馬號'], keep='first')
-                                   .reset_index(drop=True)
-                    )
+            if show_moneyflow_alerts:
+                print_high_moneyflow_alerts(race_no, minutes, time_str)
 
-                # 使用 st.expander 顯示下拉式表格
-                with st.expander("🚨 異常大額資金流紀錄 (MoneyFlow > 500)", expanded=False):
-                    if st.session_state.high_moneyflow_alerts.empty:
-                        st.info("目前尚無大於 500 的資金流紀錄。")
-                    else:
-                        # 將最新紀錄排在最上面以利閱讀
-                        display_alerts = st.session_state.high_moneyflow_alerts.sort_values(by="分鐘", ascending=True).copy()
-        
-                        # 2. 在顯示之前，將 moneyflow 轉為格式化字串 (只影響顯示，不影響原始資料)
-                        display_alerts["moneyflow"] = display_alerts["moneyflow"].apply(lambda x: f"{x:.1f}")
-                        
-                        st.table(display_alerts[["時間", "馬號", "當刻賠率", "moneyflow"]], width='stretch', hide_index=True)
-                # --- 執行過濾邏輯 ---
-                display_df = prediction_df.copy() 
-                #current_winner = prediction_df.iloc[0]['顯示名稱']
-                #st.session_state.top_rank_history.append(current_winner)
-                #current_top_4 = prediction_df.head(4)['顯示名稱'].tolist()
-                #st.session_state.top_4_history.extend(current_top_4)
-                
-                #display_df = prediction_df.copy()
-                #display_df = display_df[['馬名','騎師','馬齡','Odds', 'MoneyFlow', 'TotalFormScore', 'TotalScore']]
-                #display_df.columns = ['馬名','騎師','馬齡','當前賠率', '近期資金流(K)', '近績評分', '🔥綜合推薦分']
-                display_df = display_df[['馬名','馬齡','騎師','排位','練馬師','Odds', 'MoneyFlow']]#, 'OverallMoneyFlow']]
-                                         #, 'TotalScore']]
-                display_df.columns = ['馬名','馬齡','騎師','排位','練馬師','當前賠率', '近期資金流']#, '總資金流']
-                                      #, '🔥綜合推薦分']
-                display_df['當前賠率'] = display_df['當前賠率'].apply(lambda x: f"{x:.1f}")
-                display_df['近期資金流'] = display_df['近期資金流'].apply(lambda x: f"{x:.1f}k")
-                #display_df['總資金流'] = display_df['總資金流'].apply(lambda x: f"{x:.1f}k")
-                #display_df['🔥綜合推薦分'] = display_df['🔥綜合推薦分'].astype(int)
-                                
-
-                st.markdown("""
-                    <style>
-                    /* 強制所有表格的數據內容 (td) 不准換行 */
-                    .stTable td {
-                        white-space: nowrap !important;
-                        vertical-align: middle;
-                    }
-                    /* 允許標題 (th) 換行，並縮小字體以騰出空間 */
-                    .stTable th {
-                        white-space: normal !important;
-                        min-width: 60px; /* 給標題一個最小寬度，迫使它太擠時自動換行 */
-                        font-size: 14px !important;
-                        line-height: 1.1;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-                 
-                st.table(display_df.style.hide(axis='index'))   
+            if show_prediction_table:
+                print_prediction_table(race_no)
 
                 # 應用高亮函數
                 #st.table(display_df.style.apply(highlight_top_realtime, axis=1).hide(axis='index'))                
