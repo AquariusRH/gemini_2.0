@@ -3146,7 +3146,7 @@ if race_no in st.session_state.race_dataframes:
         horse_count = st.number_input(
             "實際參賽馬匹數量",
             min_value=1,
-            max_value=20,
+            max_value=30,
             value=int(raw_horse_count),
             step=1,
             key=f"horse_count_input_{race_no}"
