@@ -2942,10 +2942,8 @@ def calculate_money_flow_only(race_no):
 def print_money_table(race_no, title="💰 Money Flow 專用表"):
     """
     計算並顯示只包含 Money Flow 的表格（不計算 Static Score）
-    
-    Parameters:
-        race_no (int/str): 場次編號
-        title (str): 表格上方的標題
+    初始排序：按當前賠率由小到大
+    欄位：馬名、馬齡、排位、當前賠率、近期資金流、總資金流
     """
     
     # 1. 計算資料
@@ -2955,11 +2953,14 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         st.warning(f"第 {race_no} 場目前沒有 Money Flow 資料")
         return
     
-    # 2. 整理顯示用 DataFrame
-    display_money = money_df[['馬名', '馬齡', '騎師', '排位', '練馬師', 'Odds', 'MoneyFlow', 'OverallMoneyFlow']].copy()
-    display_money.columns = ['馬名', '馬齡', '騎師', '排位', '練馬師', '當前賠率', '近期資金流', '總資金流']
+    # 2. 按賠率由小到大排序（熱門在前）
+    money_df = money_df.sort_values('Odds', ascending=True)
     
-    # 3. 格式化數字
+    # 3. 整理顯示用 DataFrame（只保留指定欄位）
+    display_money = money_df[['馬名', '馬齡', '排位', 'Odds', 'MoneyFlow', 'OverallMoneyFlow']].copy()
+    display_money.columns = ['馬名', '馬齡', '排位', '當前賠率', '近期資金流', '總資金流']
+    
+    # 4. 格式化數字
     display_money['當前賠率'] = display_money['當前賠率'].apply(
         lambda x: f"{x:.1f}" if pd.notna(x) else "-"
     )
@@ -2970,10 +2971,9 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         lambda x: f"{x:.1f}k"
     )
     
-    # 4. 顯示
+    # 5. 顯示
     st.markdown(f"### {title}")
     
-    # 可選：加上不換行樣式（跟你原本的 table 一樣）
     st.markdown("""
         <style>
         .stTable td {
