@@ -2160,7 +2160,7 @@ with st.sidebar:
     
     # 監控開關
     monitoring_on = st.toggle("啟動即時監控", value=False)
-    keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", "bubble_key","save_db","show_qin_overall_heat_table"]
+    keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", "bubble_key","save_db","show_qin_overall_heat_table","show_money_table"]
     if st.button("重置所有數據"):
         for key in list(st.session_state.keys()):
             if key not in keep_keys:
@@ -2170,10 +2170,11 @@ with st.sidebar:
     show_bubble = st.toggle("📍 顯示氣泡圖", key="show_bubble", value=False)
     show_bar = st.toggle("📊 顯示長條圖", key="show_bar", value=False)
     show_move_bar = st.toggle("📊 顯示移動長條圖", key="show_move_bar", value=True)
+    show_money_table = st.toggle("📊 顯示移動長條圖", key="show_move_bar", value=True)
     show_top = st.toggle("🏆 顯示連贏賠率排名", key="show_top", value=True)
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
     save_db = st.toggle("儲存database", key="save_db", value=False)
-    show_qin_overall_heat_table = st.toggle("儲存連贏圖", key="show_qin_overall_heat_table", value=True)
+    show_qin_overall_heat_table = st.toggle("儲存連贏圖", key="show_qin_overall_heat_table", value=False)
 # --- 賽事資料加載 ---
 @st.cache_data(ttl=3600)
 def fetch_race_card(date_str, venue):
@@ -2868,6 +2869,127 @@ def calculate_smart_score_static(race_no):
     df = df[final_cols].sort_values('TotalScore', ascending=False)
     
     return df
+
+def calculate_money_flow_only(race_no):
+    """
+    只計算並回傳 Money Flow 相關資料，不計算任何 Static Score。
+    回傳欄位：馬號、馬名、騎師、排位、練馬師、當前賠率、近期資金流、總資金流
+    """
+    
+    # ----------------------------------------------------
+    # 1. 獲取最新賠率
+    # ----------------------------------------------------
+    if 'WIN' not in st.session_state.odds_dict or st.session_state.odds_dict['WIN'].empty:
+        return pd.DataFrame()
+    
+    latest_odds = st.session_state.odds_dict['WIN'].tail(1).T
+    latest_odds.columns = ['Odds']
+    
+    # ----------------------------------------------------
+    # 2. 計算 Money Flow（近期 10 筆 + 全部）
+    # ----------------------------------------------------
+    total_money_flow = pd.DataFrame(0, index=latest_odds.index, columns=['MoneyFlow'])
+    total_overall_flow = pd.DataFrame(0, index=latest_odds.index, columns=['OverallMoneyFlow'])
+    
+    for method in methodlist:
+        if method in st.session_state.diff_dict and not st.session_state.diff_dict[method].empty:
+            current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
+            all_time_sum = st.session_state.diff_dict[method].sum()
+            
+            total_money_flow['MoneyFlow'] = total_money_flow['MoneyFlow'].add(current_method_sum, fill_value=0)
+            total_overall_flow['OverallMoneyFlow'] = total_overall_flow['OverallMoneyFlow'].add(all_time_sum, fill_value=0)
+    
+    # ----------------------------------------------------
+    # 3. 建立基礎 df
+    # ----------------------------------------------------
+    df = pd.concat([latest_odds, total_money_flow, total_overall_flow], axis=1)
+    
+    # ----------------------------------------------------
+    # 4. 加入基本靜態資訊（只取名稱相關，不計算分數）
+    # ----------------------------------------------------
+    if race_no not in st.session_state.race_dataframes:
+        return pd.DataFrame()
+    
+    static_df = st.session_state.race_dataframes[race_no].copy()
+    
+    # 統一索引為字串
+    try:
+        df.index = df.index.astype(str)
+        if static_df.index.name != '馬號':
+            static_df = static_df.reset_index().set_index('馬號')
+        static_df.index = static_df.index.astype(str)
+    except Exception as e:
+        st.error(f"索引轉換錯誤: {e}")
+        return pd.DataFrame()
+    
+    # 只取需要顯示的基本欄位
+    basic_cols = ['馬名', '馬齡', '騎師', '排位', '練馬師']
+    available_cols = [col for col in basic_cols if col in static_df.columns]
+    static_basic = static_df[available_cols]
+    
+    df = df.join(static_basic, how='left')
+    
+    # 顯示名稱（可選）
+    df['顯示名稱'] = df.index.astype(str) + ". " + df['馬名'].fillna("未知")
+    
+    # ----------------------------------------------------
+    # 5. 排序（預設用近期資金流由高到低）
+    # ----------------------------------------------------
+    df = df.sort_values('MoneyFlow', ascending=False)
+    
+    return df
+
+def print_money_table(race_no, title="💰 Money Flow 專用表"):
+    """
+    計算並顯示只包含 Money Flow 的表格（不計算 Static Score）
+    
+    Parameters:
+        race_no (int/str): 場次編號
+        title (str): 表格上方的標題
+    """
+    
+    # 1. 計算資料
+    money_df = calculate_money_flow_only(race_no)
+    
+    if money_df.empty:
+        st.warning(f"第 {race_no} 場目前沒有 Money Flow 資料")
+        return
+    
+    # 2. 整理顯示用 DataFrame
+    display_money = money_df[['馬名', '馬齡', '騎師', '排位', '練馬師', 'Odds', 'MoneyFlow', 'OverallMoneyFlow']].copy()
+    display_money.columns = ['馬名', '馬齡', '騎師', '排位', '練馬師', '當前賠率', '近期資金流', '總資金流']
+    
+    # 3. 格式化數字
+    display_money['當前賠率'] = display_money['當前賠率'].apply(
+        lambda x: f"{x:.1f}" if pd.notna(x) else "-"
+    )
+    display_money['近期資金流'] = display_money['近期資金流'].apply(
+        lambda x: f"{x:.1f}k"
+    )
+    display_money['總資金流'] = display_money['總資金流'].apply(
+        lambda x: f"{x:.1f}k"
+    )
+    
+    # 4. 顯示
+    st.markdown(f"### {title}")
+    
+    # 可選：加上不換行樣式（跟你原本的 table 一樣）
+    st.markdown("""
+        <style>
+        .stTable td {
+            white-space: nowrap !important;
+            vertical-align: middle;
+        }
+        .stTable th {
+            white-space: normal !important;
+            min-width: 60px;
+            font-size: 14px !important;
+            line-height: 1.1;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    st.table(display_money.style.hide(axis='index'))
 # 嘗試加載 Race Card
 date_str = str(Date)
 if not st.session_state.api_called:
@@ -3110,6 +3232,8 @@ if monitoring_on:
                         #insidetextorientation='horizontal'
                     #)
                     #st.plotly_chart(fig4, width='stretch', key=f"top4_{time_now.strftime('&H%M%S')}")
+            if show_money_table:
+                print_money_table(race_no)
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
