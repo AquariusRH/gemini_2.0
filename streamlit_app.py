@@ -2974,7 +2974,7 @@ def print_prediction_table(race_no, title="🎯實時資金流綜合預測排名
 def calculate_money_flow_only(race_no):
     """
     只計算並回傳 Money Flow 相關資料，不計算任何 Static Score。
-    新增：同時回傳上一次賠率 (PrevOdds)
+    欄位包含：馬名、馬齡、排位、騎師、練馬師、賠率、上一次賠率、近期資金流
     """
     
     # ----------------------------------------------------
@@ -2989,7 +2989,7 @@ def calculate_money_flow_only(race_no):
     latest_odds = odds_df.tail(1).T
     latest_odds.columns = ['Odds']
     
-    # 上一次賠率（如果有兩筆以上資料）
+    # 上一次賠率
     if len(odds_df) >= 2:
         prev_odds = odds_df.iloc[-2].T
         prev_odds = pd.DataFrame(prev_odds)
@@ -2999,26 +2999,22 @@ def calculate_money_flow_only(race_no):
         prev_odds['PrevOdds'] = None
     
     # ----------------------------------------------------
-    # 2. 計算 Money Flow（近期 10 筆 + 全部）
+    # 2. 計算 Money Flow（近期 10 筆）
     # ----------------------------------------------------
     total_money_flow = pd.DataFrame(0, index=latest_odds.index, columns=['MoneyFlow'])
-    total_overall_flow = pd.DataFrame(0, index=latest_odds.index, columns=['OverallMoneyFlow'])
     
     for method in methodlist:
         if method in st.session_state.diff_dict and not st.session_state.diff_dict[method].empty:
             current_method_sum = st.session_state.diff_dict[method].tail(10).sum()
-            all_time_sum = st.session_state.diff_dict[method].sum()
-            
             total_money_flow['MoneyFlow'] = total_money_flow['MoneyFlow'].add(current_method_sum, fill_value=0)
-            total_overall_flow['OverallMoneyFlow'] = total_overall_flow['OverallMoneyFlow'].add(all_time_sum, fill_value=0)
     
     # ----------------------------------------------------
     # 3. 建立基礎 df
     # ----------------------------------------------------
-    df = pd.concat([latest_odds, prev_odds, total_money_flow, total_overall_flow], axis=1)
+    df = pd.concat([latest_odds, prev_odds, total_money_flow], axis=1)
     
     # ----------------------------------------------------
-    # 4. 加入基本靜態資訊
+    # 4. 加入基本靜態資訊（含騎師、練馬師）
     # ----------------------------------------------------
     if race_no not in st.session_state.race_dataframes:
         return pd.DataFrame()
@@ -3034,23 +3030,26 @@ def calculate_money_flow_only(race_no):
         st.error(f"索引轉換錯誤: {e}")
         return pd.DataFrame()
     
-    basic_cols = ['馬名', '馬齡', '排位']
+    basic_cols = ['馬名', '馬齡', '排位', '騎師', '練馬師']
     available_cols = [col for col in basic_cols if col in static_df.columns]
     static_basic = static_df[available_cols]
     
     df = df.join(static_basic, how='left')
     
     # ----------------------------------------------------
-    # 5. 排序（按賠率由小到大）
+    # 5. 智慧排序
     # ----------------------------------------------------
-    df = df.sort_values('Odds', ascending=True)
+    if (df['MoneyFlow'] == 0).all():
+        df = df.sort_values('Odds', ascending=True)
+    else:
+        df = df.sort_values('MoneyFlow', ascending=False)
     
     return df
 
 def print_money_table(race_no, title="💰 Money Flow 專用表"):
     """
     顯示 Money Flow 表格
-    賠率格式：現在賠率 - 上一次賠率 (↑/↓)
+    欄位：馬名、馬齡、排位、騎師、練馬師、當前賠率（含變化）、近期資金流
     """
     
     money_df = calculate_money_flow_only(race_no)
@@ -3058,9 +3057,6 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
     if money_df.empty:
         st.warning(f"第 {race_no} 場目前沒有 Money Flow 資料")
         return
-    
-    # 整理顯示用 DataFrame
-    display_money = money_df[['馬名', '馬齡', '排位', 'Odds', 'PrevOdds', 'MoneyFlow', 'OverallMoneyFlow']].copy()
     
     # 建立「現在賠率 - 上一次賠率 (箭頭)」欄位
     def format_odds_change(row):
@@ -3078,23 +3074,23 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         prev_str = f"{prev:.1f}"
         
         if current < prev:
-            arrow = "↓"      # 賠率下降（變熱）
+            arrow = "↓"
         elif current > prev:
-            arrow = "↑"      # 賠率上升（變冷）
+            arrow = "↑"
         else:
-            arrow = "→"      # 沒變
+            arrow = "→"
         
         return f"{current_str} - {prev_str} {arrow}"
     
+    display_money = money_df.copy()
     display_money['賠率變化'] = display_money.apply(format_odds_change, axis=1)
     
     # 最終顯示欄位
-    display_money = display_money[['馬名', '馬齡', '排位', '賠率變化', 'MoneyFlow', 'OverallMoneyFlow']].copy()
-    display_money.columns = ['馬名', '馬齡', '排位', '當前賠率', '近期資金流', '總資金流']
+    display_money = display_money[['馬名', '馬齡', '排位', '騎師', '練馬師', '賠率變化', 'MoneyFlow']].copy()
+    display_money.columns = ['馬名', '馬齡', '排位', '騎師', '練馬師', '當前賠率', '近期資金流']
     
     # 格式化資金流
     display_money['近期資金流'] = display_money['近期資金流'].apply(lambda x: f"{x:.1f}k")
-    display_money['總資金流'] = display_money['總資金流'].apply(lambda x: f"{x:.1f}k")
     
     # 顯示
     st.markdown(f"### {title}")
