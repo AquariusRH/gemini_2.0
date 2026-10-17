@@ -2974,7 +2974,7 @@ def print_prediction_table(race_no, title="🎯實時資金流綜合預測排名
 def calculate_money_flow_only(race_no):
     """
     只計算並回傳 Money Flow 相關資料，不計算任何 Static Score。
-    欄位包含：馬名、馬齡、排位、騎師、練馬師、賠率、上一次賠率、近期資金流
+    自動過濾賠率為 inf 的退出馬匹
     """
     
     # ----------------------------------------------------
@@ -3012,6 +3012,13 @@ def calculate_money_flow_only(race_no):
     # 3. 建立基礎 df
     # ----------------------------------------------------
     df = pd.concat([latest_odds, prev_odds, total_money_flow], axis=1)
+    
+    # ★ 過濾退出馬匹（賠率為 inf 或 -inf）
+    df = df[~df['Odds'].isin([np.inf, -np.inf])]
+    df = df[pd.notna(df['Odds'])]          # 同時去掉 NaN
+    
+    if df.empty:
+        return pd.DataFrame()
     
     # ----------------------------------------------------
     # 4. 加入基本靜態資訊（含騎師、練馬師）
