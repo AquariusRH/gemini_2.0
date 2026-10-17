@@ -2171,13 +2171,13 @@ with st.sidebar:
     show_bubble = st.toggle("📍 顯示氣泡圖", key="show_bubble", value=False)
     show_bar = st.toggle("📊 顯示長條圖", key="show_bar", value=False)
     show_move_bar = st.toggle("📊 顯示移動長條圖", key="show_move_bar", value=True)
-    show_money_table = st.toggle("顯示資金表格", key="show_money_table", value=True)
-    show_moneyflow_alerts = st.toggle("顯示資金異常表格", key="show_moneyflow_alerts", value=True)
-    show_prediction_table = st.toggle("顯示綜合評分表格", key="show_prediction_table", value=False)
+    show_money_table = st.toggle("💰顯示資金表格", key="show_money_table", value=True)
+    show_moneyflow_alerts = st.toggle("🚨顯示資金異常表格", key="show_moneyflow_alerts", value=True)
+    show_prediction_table = st.toggle("🎯顯示綜合評分表格", key="show_prediction_table", value=False)
     show_top = st.toggle("🏆 顯示連贏賠率排名", key="show_top", value=True)
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
-    save_db = st.toggle("儲存database", key="save_db", value=False)
-    show_qin_overall_heat_table = st.toggle("儲存連贏圖", key="show_qin_overall_heat_table", value=False)
+    save_db = st.toggle("📜儲存database", key="save_db", value=False)
+    show_qin_overall_heat_table = st.toggle("🎯儲存連贏圖", key="show_qin_overall_heat_table", value=False)
 # --- 賽事資料加載 ---
 @st.cache_data(ttl=3600)
 def fetch_race_card(date_str, venue):
@@ -2933,7 +2933,7 @@ def print_high_moneyflow_alerts(race_no, minutes, time_str):
                 hide_index=True
             )
 
-def print_prediction_table(race_no, title="### 🤖 實時資金流綜合預測排名"):
+def print_prediction_table(race_no, title="🎯實時資金流綜合預測排名"):
     """
     計算 smart score 並顯示主要預測表格
     欄位：馬名、馬齡、騎師、排位、練馬師、當前賠率、近期資金流
