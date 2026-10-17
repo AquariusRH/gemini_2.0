@@ -2170,7 +2170,7 @@ with st.sidebar:
     show_bubble = st.toggle("📍 顯示氣泡圖", key="show_bubble", value=False)
     show_bar = st.toggle("📊 顯示長條圖", key="show_bar", value=False)
     show_move_bar = st.toggle("📊 顯示移動長條圖", key="show_move_bar", value=True)
-    show_money_table = st.toggle("📊 顯示移動長條圖", key="show_move_bar", value=True)
+    show_money_table = st.toggle("顯示資金表格", key="show_money_table", value=True)
     show_top = st.toggle("🏆 顯示連贏賠率排名", key="show_top", value=True)
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
     save_db = st.toggle("儲存database", key="save_db", value=False)
