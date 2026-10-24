@@ -1700,14 +1700,26 @@ def print_henery_model(gamma=1.18):
             active_cols = [c for c in plot_data.columns if plot_data[c].iloc[-1] >2]
             
             if active_cols:
-                # 改為按「目前過熱組合數量」由高到低排序
-                active_cols = sorted(
-                    active_cols,
-                    key=lambda h: plot_data[h].iloc[-1],
-                    reverse=True
-                )
+                # 取得最新獨贏賠率（用於次要排序）
+                latest_win = win_df.iloc[-1] if win_df is not None else None
+            
+                def sort_key(h):
+                    count = plot_data[h].iloc[-1]
+                    # 次要排序：賠率越小越前面（熱門優先）
+                    odds = 999.0
+                    if latest_win is not None:
+                        # 兼容 int / str 的 column 名稱
+                        col_key = int(h) if (isinstance(h, str) and h.isdigit() and int(h) in latest_win.index) else h
+                        if col_key not in latest_win.index:
+                            col_key = str(h)
+                        odds = pd.to_numeric(latest_win.get(col_key, 999), errors='coerce')
+                        if pd.isna(odds):
+                            odds = 999.0
+                    return (-count, odds)   # 數量高→低，賠率低→高
+            
+                active_cols = sorted(active_cols, key=sort_key)
                 
-                z_df = plot_data[active_cols].T.iloc[::-1]  # 保持原本的反轉，讓最高的在最上方
+                z_df = plot_data[active_cols].T.iloc[::-1]  # 保持反轉，讓排序後最前面的在最上方
                 # 3. 從 win_df 抽取對應的賠率矩陣 (Text 軸)
                 # 確保 win_df 的 columns 與 active_cols 格式一致 (處理 int/str 差異)
                 # win_col_keys = [int(c) if int(c) in win_df.columns else str(c) for c in active_cols]
