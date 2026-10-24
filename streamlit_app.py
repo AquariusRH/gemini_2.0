@@ -1700,8 +1700,14 @@ def print_henery_model(gamma=1.18):
             active_cols = [c for c in plot_data.columns if plot_data[c].iloc[-1] >2]
             
             if active_cols:
-                active_cols = [h for h in full_horse_list if h in active_cols]
-                z_df = plot_data[active_cols].T.iloc[::-1] # 轉置讓 Y 軸是馬號
+                # 改為按「目前過熱組合數量」由高到低排序
+                active_cols = sorted(
+                    active_cols,
+                    key=lambda h: plot_data[h].iloc[-1],
+                    reverse=True
+                )
+                
+                z_df = plot_data[active_cols].T.iloc[::-1]  # 保持原本的反轉，讓最高的在最上方
                 # 3. 從 win_df 抽取對應的賠率矩陣 (Text 軸)
                 # 確保 win_df 的 columns 與 active_cols 格式一致 (處理 int/str 差異)
                 # win_col_keys = [int(c) if int(c) in win_df.columns else str(c) for c in active_cols]
