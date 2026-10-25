@@ -2969,7 +2969,92 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         """, unsafe_allow_html=True)
     
     st.table(display_money.style.hide(axis='index'))
-    
+
+GRAPHQL_URL = "https://info.cld.hkjc.com/graphql/base/"
+
+# ⚠️ 這串是從 bet.hkjc.com 抓到的白名單 query，不要改空白/換行/欄位
+RACE_MEETINGS_QUERY = (
+    'fragment raceFragment on Race{id no status raceName_en raceName_ch postTime '
+    'country_en country_ch distance wageringFieldSize go_en go_ch ratingType '
+    'raceTrack{description_en description_ch}raceCourse{description_en description_ch displayCode}'
+    'claCode raceClass_en raceClass_ch judgeSigns{value_en}}'
+    'fragment racingBlockFragment on RaceMeeting{'
+    'jpEsts:pmPools(oddsTypes:[WIN PLA TCE TRI FF QTT DT TT SixUP]filters:["jackpot" "estimatedDividend"])'
+    '{leg{number races}oddsType jackpot estimatedDividend mergedPoolId}'
+    'poolInvs:pmPools(oddsTypes:[WIN PLA QIN QPL CWA CWB CWC IWN FCT TCE TRI FF QTT DBL TBL DT TT SixUP])'
+    '{id leg{races}}'
+    'penetrometerReadings(filters:["first"]){reading readingTime}'
+    'hammerReadings(filters:["first"]){reading readingTime}'
+    'changeHistories(filters:["top3"]){type time raceNo runnerNo horseName_ch horseName_en '
+    'jockeyName_ch jockeyName_en scratchHorseName_ch scratchHorseName_en handicapWeight scrResvIndicator}}'
+    'query raceMeetings($date:String $venueCode:String){timeOffset{rc}'
+    'activeMeetings:raceMeetings{id venueCode date status races{no postTime status wageringFieldSize}'
+    'poolInvs:pmPools(oddsTypes:[WIN PLA QIN QPL CWA CWB CWC IWN FCT TCE TRI FF QTT DBL TBL DT TT SixUP]){status}}'
+    'raceMeetings(date:$date venueCode:$venueCode){id status venueCode date totalNumberOfRace '
+    'currentNumberOfRace dateOfWeek meetingType totalInvestment country{code namech nameen seq}'
+    'races{...raceFragment runners{id no standbyNo status name_ch name_en horse{id code}color '
+    'barrierDrawNumber handicapWeight currentWeight currentRating internationalRating gearInfo '
+    'racingColorFileName allowance trainerPreference last6run saddleClothNo trumpCard priority '
+    'finalPosition deadHeat winOdds jockey{code name_en name_ch}trainer{code name_en name_ch}}}'
+    'obSt:pmPools(oddsTypes:[WIN PLA]){leg{races}oddsType comingleStatus}'
+    'poolInvs:pmPools(oddsTypes:[WIN PLA QIN QPL CWA CWB CWC IWN FCT TCE TRI FF QTT DBL TBL DT TT SixUP])'
+    '{id leg{number races}status sellStatus oddsType investment mergedPoolId lastUpdateTime}'
+    '...racingBlockFragment pmPools(oddsTypes:[]){id}'
+    'jkcInstNo:foPools(oddsTypes:[JKC]filters:["top"]){instNo}'
+    'tncInstNo:foPools(oddsTypes:[TNC]filters:["top"]){instNo}}}'
+)
+
+
+def fetch_post_times(date_str: str, venue: str) -> dict:
+    """
+    取得每場開跑時間。
+    回傳: {1: "12:40", 2: "13:10", ...}
+    若失敗回傳 {}
+    """
+    payload = {
+        "operationName": "raceMeetings",
+        "variables": {
+            "date": str(date_str),   # "YYYY-MM-DD"
+            "venueCode": venue,      # "ST" / "HV"
+        },
+        "query": RACE_MEETINGS_QUERY,
+    }
+
+    try:
+        resp = requests.post(GRAPHQL_URL, headers=HEADERS, json=payload, timeout=15)
+        data = resp.json()
+    except Exception:
+        return {}
+
+    if data.get("errors"):
+        return {}
+
+    meetings = (data.get("data") or {}).get("raceMeetings") or []
+    if not meetings:
+        return {}
+
+    result = {}
+    for race in meetings[0].get("races") or []:
+        try:
+            race_no = int(race.get("no"))
+        except (TypeError, ValueError):
+            continue
+
+        pt = race.get("postTime")  # e.g. "2026-10-25T12:40:00+08:00"
+        if not pt:
+            result[race_no] = None
+            continue
+
+        # 轉成 HH:MM（香港時間）
+        try:
+            # 相容有/無時區字串
+            dt = datetime.fromisoformat(pt.replace("Z", "+00:00"))
+            result[race_no] = dt.strftime("%H:%M")
+        except Exception:
+            result[race_no] = pt  # 解析失敗就回原始字串
+
+    return result
+
 # 嘗試加載 Race Card
 date_str = str(Date)
 if not st.session_state.api_called:
@@ -2979,10 +3064,19 @@ if not st.session_state.api_called:
         else:
             race_card_data = fetch_race_card_oversea(date_str, place,race_no)
 
+        post_time_dict = fetch_post_times(date_str, place)
+
+        # 若你本來是從 race_card_data 組：
         if race_card_data:
-            st.session_state.race_dataframes = {k: v['df'] for k,v in race_card_data.items()}
-            st.session_state.post_time_dict = {k: v['post_time'] for k,v in race_card_data.items()}
+            st.session_state.race_dataframes = {k: v['df'] for k, v in race_card_data.items()}
+            # 優先用獨立抓到的 post_time
+            st.session_state.post_time_dict = {
+                k: post_time_dict.get(k) or v.get('post_time')
+                for k, v in race_card_data.items()
+            }
             st.session_state.api_called = True
+        else:
+            st.session_state.post_time_dict = post_time_dict
 
 # --- 顯示賽事資訊 ---
 if race_no in st.session_state.race_dataframes:
