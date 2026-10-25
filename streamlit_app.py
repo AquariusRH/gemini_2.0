@@ -2202,7 +2202,15 @@ def fetch_race_card(date_str, venue):
     # 這是一個簡化的 RaceCard 抓取，只抓基本資料以顯示
     # 完整邏輯較長，這裡保留核心概念：抓取馬名與基本資料
     url = 'https://info.cld.hkjc.com/graphql/base/'
-    headers = {'Content-Type': 'application/json'}
+    #headers = {'Content-Type': 'application/json'}
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://racing.hkjc.com/',
+        'Origin': 'https://racing.hkjc.com',
+        'Accept': '*/*',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+    }
     payload = {
         "operationName": "raceMeetings",
         "variables": {"date": date_str, "venueCode": venue},
