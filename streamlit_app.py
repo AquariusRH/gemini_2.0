@@ -2222,13 +2222,6 @@ def fetch_race_card(date_str, venue):
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
-        st.write(response.status_code)
-        if response.status_code == 200:
-            try:
-                res_json = response.json()
-                st.write("DEBUG 原始 JSON 回應：", res_json)  # 👈 在畫面上直接查看內容
-            except Exception as e:
-                st.write("DEBUG 回應非 JSON 格式：", response.text[:500])
         if response.status_code == 200:
             data = response.json()
             races = data.get('data', {}).get('raceMeetings', [])
@@ -3007,15 +3000,14 @@ RACE_MEETINGS_QUERY = (
 
 def fetch_post_times(date_str: str, venue: str) -> dict:
     """
-    取得每場開跑時間。
-    回傳: {1: "12:40", 2: "13:10", ...}
-    若失敗回傳 {}
+    回傳 {race_no: datetime 或 None}
+    例如 {1: datetime(2026, 10, 25, 12, 40, tzinfo=...), 2: ...}
     """
     payload = {
         "operationName": "raceMeetings",
         "variables": {
-            "date": str(date_str),   # "YYYY-MM-DD"
-            "venueCode": venue,      # "ST" / "HV"
+            "date": str(date_str),
+            "venueCode": venue,
         },
         "query": RACE_MEETINGS_QUERY,
     }
@@ -3040,18 +3032,15 @@ def fetch_post_times(date_str: str, venue: str) -> dict:
         except (TypeError, ValueError):
             continue
 
-        pt = race.get("postTime")  # e.g. "2026-10-25T12:40:00+08:00"
+        pt = race.get("postTime")  # "2026-10-25T12:40:00+08:00"
         if not pt:
             result[race_no] = None
             continue
 
-        # 轉成 HH:MM（香港時間）
         try:
-            # 相容有/無時區字串
-            dt = datetime.fromisoformat(pt.replace("Z", "+00:00"))
-            result[race_no] = dt.strftime("%H:%M")
+            result[race_no] = datetime.fromisoformat(pt.replace("Z", "+00:00"))
         except Exception:
-            result[race_no] = pt  # 解析失敗就回原始字串
+            result[race_no] = None
 
     return result
 
