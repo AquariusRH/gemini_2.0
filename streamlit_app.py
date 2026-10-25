@@ -2203,7 +2203,7 @@ def fetch_race_card(date_str, venue):
     # 完整邏輯較長，這裡保留核心概念：抓取馬名與基本資料
     url = 'https://info.cld.hkjc.com/graphql/base/'
     #headers = {'Content-Type': 'application/json'}
-        headers = {
+    headers = {
         # 1. 偽裝成真實瀏覽器 (User-Agent)
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         
