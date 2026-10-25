@@ -2204,211 +2204,33 @@ def fetch_race_card(date_str, venue):
     url = 'https://info.cld.hkjc.com/graphql/base/'
     #headers = {'Content-Type': 'application/json'}
     headers = {
-            'accept': '*/*',
-            'accept-language': 'en-us,en;q=0.9',
-            'content-type': 'application/json',
-            'origin': 'https://racing.hkjc.com',
-            'priority': 'u=1, i',
-            'referer': 'https://racing.hkjc.com/',
-            'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-site',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
-        }
+    "accept": "*/*",
+    "accept-language": "en,zh-TW;q=0.9,zh;q=0.8",
+    "content-type": "application/json",
+    "origin": "https://bet.hkjc.com",
+    "referer": "https://bet.hkjc.com/",
+    "sec-ch-ua": '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+    "sec-ch-ua-mobile": "?1",
+    "sec-ch-ua-platform": '"Android"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": (
+        "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36"
+    ),
+    }
+
+    # ⚠️ 這個字串不能改任何一個字元（包含換行）
+    CARD_QUERY = "query racing($date: String, $venueCode: String) {\n  raceMeetings(date: $date, venueCode: $venueCode) {\n    status\n    currentNumberOfRace\n    totalInvestment\n    races {\n      no\n      status\n      runners {\n        id\n        no\n        standbyNo\n        status\n        name_ch\n        name_en\n        horse {\n          id\n          code\n        }\n        color\n        barrierDrawNumber\n        handicapWeight\n        currentWeight\n        currentRating\n        internationalRating\n        gearInfo\n        racingColorFileName\n        allowance\n        trainerPreference\n        last6run\n        saddleClothNo\n        trumpCard\n        priority\n        finalPosition\n        deadHeat\n        winOdds\n        jockey {\n          code\n          name_en\n          name_ch\n        }\n        trainer {\n          code\n          name_en\n          name_ch\n        }\n      }\n    }\n  }\n}"
     payload = {
-        "operationName": "raceMeetings",
-        "variables": {"date": date_str, "Racecourse": venue},
-        "query": """
-      fragment raceFragment on Race {
-        id
-        no
-        status
-        raceName_en
-        raceName_ch
-        postTime
-        country_en
-        country_ch
-        distance
-        wageringFieldSize
-        go_en
-        go_ch
-        ratingType
-        raceTrack {
-          description_en
-          description_ch
-        }
-        raceCourse {
-          description_en
-          description_ch
-          displayCode
-        }
-        claCode
-        raceClass_en
-        raceClass_ch
-        judgeSigns {
-          value_en
-        }
-      }
-  
-      fragment racingBlockFragment on RaceMeeting {
-        jpEsts: pmPools(
-          oddsTypes: [TCE, TRI, FF, QTT, DT, TT, SixUP]
-          filters: ["jackpot", "estimatedDividend"]
-        ) {
-          leg {
-            number
-            races
-          }
-          oddsType
-          jackpot
-          estimatedDividend
-          mergedPoolId
-        }
-        poolInvs: pmPools(
-          oddsTypes: [WIN, PLA, QIN, QPL, CWA, CWB, CWC, IWN, FCT, TCE, TRI, FF, QTT, DBL, TBL, DT, TT, SixUP]
-        ) {
-          id
-          leg {
-            races
-          }
-        }
-        penetrometerReadings(filters: ["first"]) {
-          reading
-          readingTime
-        }
-        hammerReadings(filters: ["first"]) {
-          reading
-          readingTime
-        }
-        changeHistories(filters: ["top3"]) {
-          type
-          time
-          raceNo
-          runnerNo
-          horseName_ch
-          horseName_en
-          jockeyName_ch
-          jockeyName_en
-          scratchHorseName_ch
-          scratchHorseName_en
-          handicapWeight
-          scrResvIndicator
-        }
-      }
-  
-      query raceMeetings($date: String, $venueCode: String) {
-        timeOffset {
-          rc
-        }
-        activeMeetings: raceMeetings {
-          id
-          venueCode
-          date
-          status
-          races {
-            no
-            postTime
-            status
-            wageringFieldSize
-          }
-        }
-        raceMeetings(date: $date, venueCode: $venueCode) {
-          id
-          status
-          venueCode
-          date
-          totalNumberOfRace
-          currentNumberOfRace
-          dateOfWeek
-          meetingType
-          totalInvestment
-          country {
-            code
-            namech
-            nameen
-            seq
-          }
-          races {
-            ...raceFragment
-            runners {
-              id
-              no
-              standbyNo
-              status
-              name_ch
-              name_en
-              horse {
-                id
-                code
-              }
-              color
-              barrierDrawNumber
-              handicapWeight
-              currentWeight
-              currentRating
-              internationalRating
-              gearInfo
-              racingColorFileName
-              allowance
-              trainerPreference
-              last6run
-              saddleClothNo
-              trumpCard
-              priority
-              finalPosition
-              deadHeat
-              winOdds
-              jockey {
-                code
-                name_en
-                name_ch
-              }
-              trainer {
-                code
-                name_en
-                name_ch
-              }
-            }
-          }
-          obSt: pmPools(oddsTypes: [WIN, PLA]) {
-            leg {
-              races
-            }
-            oddsType
-            comingleStatus
-          }
-          poolInvs: pmPools(
-            oddsTypes: [WIN, PLA, QIN, QPL, CWA, CWB, CWC, IWN, FCT, TCE, TRI, FF, QTT, DBL, TBL, DT, TT, SixUP]
-          ) {
-            id
-            leg {
-              number
-              races
-            }
-            status
-            sellStatus
-            oddsType
-            investment
-            mergedPoolId
-            lastUpdateTime
-          }
-          ...racingBlockFragment
-          pmPools(oddsTypes: []) {
-            id
-          }
-          jkcInstNo: foPools(oddsTypes: [JKC], filters: ["top"]) {
-            instNo
-          }
-          tncInstNo: foPools(oddsTypes: [TNC], filters: ["top"]) {
-            instNo
-          }
-        }
-      }
-      """
-  }
+        "operationName": "racing",          # 必須是 racing
+        "variables": {
+            "date": date_str,               # e.g. "2026-10-22"
+            "venueCode": venue              # "ST" 或 "HV"
+        },
+        "query": CARD_QUERY
+    }
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
