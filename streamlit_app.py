@@ -2399,6 +2399,12 @@ def fetch_race_card(date_str, venue):
         response = requests.post(url, headers=headers, json=payload, timeout=10)
         st.write(response.status_code)
         if response.status_code == 200:
+            try:
+                res_json = response.json()
+                st.write("DEBUG 原始 JSON 回應：", res_json)  # 👈 在畫面上直接查看內容
+            except Exception as e:
+                st.write("DEBUG 回應非 JSON 格式：", response.text[:500])
+        if response.status_code == 200:
             data = response.json()
             races = data.get('data', {}).get('raceMeetings', [])
             race_info = {}
