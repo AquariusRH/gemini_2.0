@@ -2397,6 +2397,7 @@ def fetch_race_card(date_str, venue):
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)
+        st.write(response.status_code)
         if response.status_code == 200:
             data = response.json()
             races = data.get('data', {}).get('raceMeetings', [])
