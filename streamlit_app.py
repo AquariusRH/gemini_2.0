@@ -2225,7 +2225,7 @@ def fetch_race_card(date_str, venue):
     }
     payload = {
         "operationName": "raceMeetings",
-        "variables": {"date": date_str, "venueCode": venue},
+        "variables": {"date": date_str, "Racecourse": venue},
         "query": """
       fragment raceFragment on Race {
         id
