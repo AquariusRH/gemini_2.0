@@ -2203,13 +2203,25 @@ def fetch_race_card(date_str, venue):
     # 完整邏輯較長，這裡保留核心概念：抓取馬名與基本資料
     url = 'https://info.cld.hkjc.com/graphql/base/'
     #headers = {'Content-Type': 'application/json'}
-    headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://racing.hkjc.com/',
-        'Origin': 'https://racing.hkjc.com',
-        'Accept': '*/*',
-        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        headers = {
+        # 1. 偽裝成真實瀏覽器 (User-Agent)
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        
+        # 2. 模擬來自馬會官方網站的請求 (Referer & Origin)
+        "Referer": "https://racing.hkjc.com/",
+        "Origin": "https://racing.hkjc.com",
+        
+        # 3. 聲明接受 JSON 格式 response
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        
+        # 4. 關閉防追蹤標頭（部分 API 對此敏感）
+        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site"
     }
     payload = {
         "operationName": "raceMeetings",
