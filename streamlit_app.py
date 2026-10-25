@@ -2204,25 +2204,20 @@ def fetch_race_card(date_str, venue):
     url = 'https://info.cld.hkjc.com/graphql/base/'
     #headers = {'Content-Type': 'application/json'}
     headers = {
-        # 1. 偽裝成真實瀏覽器 (User-Agent)
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        
-        # 2. 模擬來自馬會官方網站的請求 (Referer & Origin)
-        "Referer": "https://racing.hkjc.com/",
-        "Origin": "https://racing.hkjc.com",
-        
-        # 3. 聲明接受 JSON 格式 response
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        
-        # 4. 關閉防追蹤標頭（部分 API 對此敏感）
-        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-site"
-    }
+            'accept': '*/*',
+            'accept-language': 'en-us,en;q=0.9',
+            'content-type': 'application/json',
+            'origin': 'https://racing.hkjc.com',
+            'priority': 'u=1, i',
+            'referer': 'https://racing.hkjc.com/',
+            'sec-ch-ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-site',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+        }
     payload = {
         "operationName": "raceMeetings",
         "variables": {"date": date_str, "Racecourse": venue},
