@@ -1478,31 +1478,13 @@ def analyze_tce_investment(
             )
 
     # ==========================================
-    # 9. 顯示唯一排名表
+    # 顯示預測資金流入排名
     # ==========================================
-
-    st.markdown(
-        "### 預測資金流入排名"
-    )
-
-    st.caption(
-        "排序：三分鐘實際資金變化（高至低）"
-        " → 獨贏賠率（低至高）。"
-        "預測資金變化只作參考，不影響排名。"
-    )
-
-    # 未滿三分鐘的提示
-    if horse_summary["三分鐘資金變化"].notna().sum() == 0:
-
-        st.warning(
-            "監控資料未累積完整三分鐘，"
-            "暫時未能計算真正的三分鐘資金變化。"
-        )
-
-    # 只顯示前 N 匹
+    
+    st.markdown("### 預測資金流入排名")
+    
     display_df = horse_summary.head(top_n).copy()
     
-    # 獨贏賠率格式
     def format_win_odds(value):
         if pd.isna(value):
             return "-"
@@ -1520,23 +1502,20 @@ def analyze_tce_investment(
     
     
     display_df["獨贏賠率"] = (
-        display_df["獨贏賠率"]
-        .map(format_win_odds)
+        display_df["獨贏賠率"].map(format_win_odds)
     )
     
-    # 金額欄位只在顯示時轉換成 K
+    # 金額轉換為 K
     money_columns = [
         "三分鐘前總投注額",
         "最新總投注額",
-        "三分鐘資金變化",
-        "預測資金變化",
-        "預測後總投注額"
+        "三分鐘資金變化"
     ]
     
     for col in money_columns:
         display_df[col] = display_df[col] / 1000
     
-    # 不顯示排名 Column
+    # 只保留以下六個欄位
     display_df = display_df[
         [
             "馬號",
@@ -1544,19 +1523,14 @@ def analyze_tce_investment(
             "獨贏賠率",
             "三分鐘前總投注額",
             "最新總投注額",
-            "三分鐘資金變化",
-            "預測資金變化",
-            "預測後總投注額"
+            "三分鐘資金變化"
         ]
     ]
     
-    # 顯示 K 單位
     styled_df = display_df.style.format({
-        "三分鐘前總投注額": "{:,.1f}K",
-        "最新總投注額": "{:,.1f}K",
-        "三分鐘資金變化": "{:+,.1f}K",
-        "預測資金變化": "{:+,.1f}K",
-        "預測後總投注額": "{:,.1f}K"
+        "三分鐘前總投注額": "{:,.2f}K",
+        "最新總投注額": "{:,.2f}K",
+        "三分鐘資金變化": "{:+,.2f}K"
     }, na_rep="-")
     
     st.table(styled_df)
