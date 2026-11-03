@@ -745,6 +745,12 @@ def change_overall(time_now):
 
 def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataFrame:
     """請求三重彩投注額，並存進 st.session_state['tce_investment_df']"""
+    if isinstance(date, (datetime, pd.Timestamp)):
+        date = date.strftime("%Y-%m-%d")
+    elif hasattr(date, "strftime"):
+        date = date.strftime("%Y-%m-%d")
+    else:
+        date = str(date)
     url = "https://info.cld.hkjc.com/graphql/base/"
     
     payload = {
