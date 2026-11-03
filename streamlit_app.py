@@ -835,6 +835,36 @@ def get_tce_invest_data(date: str, venue_code: str, race_no: int, save_to_sessio
     except Exception as e:
         st.warning(f"取得 TCEInvest 資料失敗: {e}")
         return pd.DataFrame()
+
+def print_tce_df():
+    """顯示三重彩投注額表格（從 session_state 讀取）"""
+    tce_df = st.session_state.get("tce_invest", pd.DataFrame())
+    
+    if tce_df.empty:
+        st.info("目前沒有三重彩投注額資料")
+        return
+    
+    st.subheader("三重彩投注額 (TCEInvest)")
+    
+    # 顯示最後更新時間
+    update_time = st.session_state.get("tce_invest_update_time")
+    if update_time:
+        st.caption(f"最後更新：{update_time}")
+    
+    # 顯示目前查詢的場次資訊
+    race_info = st.session_state.get("tce_invest_race", {})
+    if race_info:
+        st.caption(f"賽事：{race_info.get('date')} | {race_info.get('venue')} | 第 {race_info.get('race_no')} 場")
+    
+    st.dataframe(
+        tce_df.style.format({
+            "第一名": "{:,.0f}",
+            "第二名": "{:,.0f}",
+            "第三名": "{:,.0f}"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
 # ==================== 3. 繪圖函數 (簡化版) ====================
 def print_bar_chart(time_now):
   post_time = st.session_state.post_time_dict[race_no]
@@ -3375,7 +3405,7 @@ if monitoring_on:
                 if tables.get("notice_table"):
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
 
-
+            print_tce_df()
             time.sleep(time_delay)
         
 
