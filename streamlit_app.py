@@ -3090,7 +3090,7 @@ else:
 
 # ==================== 5. 監控循環邏輯 ====================
 
-methodlist = ['WIN', 'PLA', 'QIN', 'QPL'] # 簡化預設
+methodlist = ['WIN', 'PLA', 'QIN', 'QPL','TRI'] # 簡化預設
 time_delay = 10
 
 # 3. 關鍵：判斷式必須使用手動覆蓋後的 horse_no，而不是舊的 len(...)
