@@ -753,7 +753,7 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
             "date": date,
             "venueCode": venue_code,
             "raceNo": race_no,
-            "oddsTypes": ":["WIN","TCEInvest"]}
+            "oddsTypes": ":["WIN","TCEInvest"]
         },
         "query": """
         query sp4e_racing_pmPool($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
