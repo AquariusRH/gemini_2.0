@@ -715,7 +715,7 @@ def weird_data(investments):
         latest_investment = st.session_state.investment_dict[method].tail(1).values
         last_time_odds = st.session_state.odds_dict[method].tail(2).head(1)
         
-         Calculation logic remains the same
+         #Calculation logic remains the same
         expected_investment = investments[method][0] / 1000 / last_time_odds
         diff = (latest_investment - expected_investment).round(0)
         
