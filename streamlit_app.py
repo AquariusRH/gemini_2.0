@@ -246,6 +246,9 @@ def get_odds_data(Date, place, race_no, methodlist):
     for o_type in ("QIN", "QPL", "FCT", "TRI", "FF"):
         if odds_values[o_type]:
             odds_values[o_type].sort(key=lambda x: x[0])
+
+    st.write("TRI 注數:", len(odds_values.get("TRI") or []))
+    st.write("TRI 前5筆:", (odds_values.get("TRI") or [])[:5])
     return odds_values
 
 def get_investment_data(Date, place, race_no, methodlist):
@@ -3235,8 +3238,7 @@ if monitoring_on:
                 
             if show_henery:
                 print_henery_model(gamma=1.18)
-            st.write("TRI 注數:", len(odds_values.get("TRI") or []))
-            st.write("TRI 前5筆:", (odds_values.get("TRI") or [])[:5])
+                
             if save_db:
                 # --- 策略 B：常規賠率 Snapshot 降頻寫入 (例如每 60 秒一次) ---
                 current_timestamp = time.time()
