@@ -743,7 +743,12 @@ def change_overall(time_now):
         [st.session_state.diff_dict['overall'], total_investment_df]
     )
 
-def request_tce_investment(date: str,venue_code: str,race_no: int,time_now=None) -> pd.DataFrame:
+def request_tce_investment(
+    date: str,
+    venue_code: str,
+    race_no: int,
+    time_now=None
+) -> pd.DataFrame:
     """請求三重彩投注額，以時間為 Index、馬號及名次為 Columns"""
 
     if isinstance(date, (datetime, pd.Timestamp)):
@@ -758,10 +763,20 @@ def request_tce_investment(date: str,venue_code: str,race_no: int,time_now=None)
         time_now = datetime.now()
 
     # 取得現有歷史 DataFrame
-    tce_df = st.session_state.get("tce_investment_df",pd.DataFrame())
+    tce_df = st.session_state.get(
+        "tce_investment_df",
+        pd.DataFrame()
+    )
 
     # 舊版 DataFrame 結構不符合新格式時，重新初始化
-    if (not tce_df.empty and (not isinstance(tce_df.columns, pd.MultiIndex) or tce_df.columns.nlevels != 2)):
+    if (
+        not tce_df.empty 
+        and (
+            not isinstance(tce_df.columns, 
+                           pd.MultiIndex) 
+            or tce_df.columns.nlevels != 2
+        )
+    ):
         tce_df = pd.DataFrame()
 
     url = "https://info.cld.hkjc.com/graphql/base/"
@@ -792,7 +807,11 @@ def request_tce_investment(date: str,venue_code: str,race_no: int,time_now=None)
     }
 
     try:
-        resp = requests.post(url,json=payload,headers=headers,timeout=10)
+        resp = requests.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=10)
 
         resp.raise_for_status()
         data = resp.json()
@@ -805,7 +824,10 @@ def request_tce_investment(date: str,venue_code: str,race_no: int,time_now=None)
 
         pools = meetings[0].get("pmPools", [])
 
-        tce_pool = next((p for p in pools if p.get("oddsType") == "TCEInvest"), None )
+        tce_pool = next(
+            (p for p in pools if p.get("oddsType") == "TCEInvest"),
+            None 
+        )
 
         if not tce_pool or not tce_pool.get("oddsNodes"):
             st.session_state["tce_investment_df"] = tce_df
