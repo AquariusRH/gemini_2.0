@@ -796,19 +796,48 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
             return pd.DataFrame()
         
         rows = []
-        for node in tce_pool["oddsNodes"]:
-            horse = node.get("combString")
-            inv = {b["combString"]: int(b["oddsValue"] or 0) for b in node.get("bankerOdds", [])}
+
+        for node in odds_nodes:
+            horse_no = node.get("combString")
+        
+            banker_odds = node.get("bankerOdds") or []
+        
+            investment = {
+                "第一名": 0,
+                "第二名": 0,
+                "第三名": 0
+            }
+        
+            for item in banker_odds:
+                position = item.get("combString")
+                amount = item.get("oddsValue", 0) or 0
+        
+                if position == "1":
+                    investment["第一名"] = amount
+                elif position == "2":
+                    investment["第二名"] = amount
+                elif position == "3":
+                    investment["第三名"] = amount
+        
             rows.append({
-                "馬號": horse,
-                "第一名": inv.get("1", 0),
-                "第二名": inv.get("2", 0),
-                "第三名": inv.get("3", 0),
+                "馬號": horse_no,
+                **investment
             })
         
         df = pd.DataFrame(rows)
-        df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
-        df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
+        
+        if not df.empty:
+            # 馬號作為 index
+            df = df.set_index("馬號")
+        
+            # 三個名次的投注額全部為 0，就視為退出馬匹，不顯示
+            df = df[
+                ~(
+                    (df["第一名"] == 0) &
+                    (df["第二名"] == 0) &
+                    (df["第三名"] == 0)
+                )
+            ]
         
         st.session_state["tce_investment_df"] = df
         return df
