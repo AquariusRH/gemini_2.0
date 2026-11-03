@@ -1429,52 +1429,27 @@ def analyze_tce_investment(
     # 投注額 + 與最新投注額的差距
     # ------------------------------------------
 
-    def format_amount_difference(amount, difference):
+    def format_difference(difference):
+    if pd.isna(difference):
+        return "-"
+    return f"{float(difference) / 1000:+,.2f}K"
 
-        if pd.isna(amount):
-            return "-"
 
-        amount_k = float(amount) / 1000
-
-        if pd.isna(difference):
-
-            return f"{amount_k:,.2f}K (-)"
-
-        difference_k = float(difference) / 1000
-
-        return (
-            f"{amount_k:,.2f}K "
-            f"({difference_k:+,.2f}K)"
-        )
-
-    # 三分鐘前：投注額（與最新投注額差距）
-    display_df["三分鐘前"] = display_df.apply(
-        lambda row: format_amount_difference(
-            row["三分鐘前總投注額"],
-            row["三分鐘資金變化"]
-        ),
-        axis=1
+    display_df = summary_df[
+        ["馬號", "馬名", "獨贏賠率"]
+    ].copy()
+    
+    # 只顯示與最新總投注額的差距
+    display_df["三分鐘前"] = summary_df["三分鐘資金變化"].apply(
+        format_difference
     )
-
-    # 一分鐘前：投注額（與最新投注額差距）
-    display_df["一分鐘前"] = display_df.apply(
-        lambda row: format_amount_difference(
-            row["一分鐘前總投注額"],
-            row["一分鐘資金變化"]
-        ),
-        axis=1
+    
+    display_df["一分鐘前"] = summary_df["一分鐘資金變化"].apply(
+        format_difference
     )
-
-    # 最新投注額
-    display_df["最新總投注"] = (
-        display_df["最新總投注額"]
-        .apply(
-            lambda x: (
-                f"{x / 1000:,.2f}K"
-                if pd.notna(x)
-                else "-"
-            )
-        )
+    
+    display_df["最新總投注"] = summary_df["最新總投注額"].apply(
+        lambda x: "-" if pd.isna(x) else f"{float(x) / 1000:,.2f}K"
     )
 
     display_df["獨贏賠率"] = (
