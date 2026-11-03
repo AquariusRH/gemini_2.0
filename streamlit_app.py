@@ -92,7 +92,10 @@ def init_session_state():
         'top_4_history': [],
         'horse_history': {},
         'high_moneyflow_alerts': pd.DataFrame(columns=["分鐘","時間", "馬號", "當刻賠率", "moneyflow"])
-    }
+    },
+        'tce_invest': pd.DataFrame(),
+        'tce_invest_update_time': None,
+        'tce_invest_race': {},
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
@@ -742,9 +745,11 @@ def change_overall(time_now):
         [st.session_state.diff_dict['overall'], total_investment_df]
     )
 
-def get_tce_invest_data(date: str, venue_code: str, race_no: int) -> pd.DataFrame:
+def get_tce_invest_data(date: str, venue_code: str, race_no: int, save_to_session: bool = True) -> pd.DataFrame:
     """
     取得三重彩 (TCE) 各馬第一名 / 第二名 / 第三名投注額
+    並自動存進 st.session_state['tce_invest']
+    
     回傳 DataFrame 欄位：馬號, 第一名, 第二名, 第三名
     """
     url = "https://info.cld.hkjc.com/graphql/base/"
@@ -811,9 +816,19 @@ def get_tce_invest_data(date: str, venue_code: str, race_no: int) -> pd.DataFram
         
         df = pd.DataFrame(rows)
         
-        # 排序（數字優先，避免 10 排在 2 前面）
+        # 排序（數字優先）
         df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
         df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
+        
+        # ===== 自動存進 session_state =====
+        if save_to_session:
+            st.session_state["tce_invest"] = df
+            st.session_state["tce_invest_update_time"] = tce_pool.get("lastUpdateTime")
+            st.session_state["tce_invest_race"] = {
+                "date": date,
+                "venue": venue_code,
+                "race_no": race_no
+            }
         
         return df
     
@@ -3360,21 +3375,7 @@ if monitoring_on:
                 if tables.get("notice_table"):
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
 
-                        # 取得三重彩投注額
-            tce_df = get_tce_invest_data(str(Date), place, int(race_no))
-            
-            if not tce_df.empty:
-                st.subheader("三重彩投注額 (TCEInvest)")
-                st.dataframe(
-                    tce_df.style.format({
-                        "第一名": "{:,.0f}",
-                        "第二名": "{:,.0f}",
-                        "第三名": "{:,.0f}"
-                    }),
-                    use_container_width=True
-                )
-            else:
-                st.info("目前沒有三重彩投注額資料")
+
             time.sleep(time_delay)
         
 
