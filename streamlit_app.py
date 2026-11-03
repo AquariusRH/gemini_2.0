@@ -3359,6 +3359,7 @@ if monitoring_on:
         
             request_tce_investment(Date, place, race_no)
             tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
+            st.write(tce_df)
             time.sleep(time_delay)
         
 
