@@ -2166,7 +2166,7 @@ with st.sidebar:
     # 監控開關
     monitoring_on = st.toggle("啟動即時監控", value=False)
     keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", 
-                 "bubble_key","save_db","show_qin_overall_heat_table","show_money_table","show_moneyflow_alerts","show_prediction_table"]
+                 "bubble_key","save_db","show_qin_overall_heat_table","show_money_table","show_moneyflow_alerts","show_prediction_table","show_tri"]
     if st.button("重置所有數據"):
         for key in list(st.session_state.keys()):
             if key not in keep_keys:
@@ -2183,6 +2183,7 @@ with st.sidebar:
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
     save_db = st.toggle("📜儲存database", key="save_db", value=False)
     show_qin_overall_heat_table = st.toggle("🎯儲存連贏圖", key="show_qin_overall_heat_table", value=False)
+    show_tri = st.toggle("🎯 顯示三重彩 (TRI) 排名", key="show_tri", value=True)
 # --- 賽事資料加載 ---
 @st.cache_data(ttl=3600)
 def fetch_race_card(date_str, venue):
@@ -3089,7 +3090,7 @@ else:
 
 # ==================== 5. 監控循環邏輯 ====================
 
-methodlist = ['WIN', 'PLA', 'QIN', 'QPL'] # 簡化預設
+methodlist = ['WIN', 'PLA', 'QIN', 'QPL', 'FCT', 'TRI'] # 簡化預設
 time_delay = 10
 
 # 3. 關鍵：判斷式必須使用手動覆蓋後的 horse_no，而不是舊的 len(...)
@@ -3272,7 +3273,14 @@ if monitoring_on:
                         # 加上 try-except 避免 DB 異常導致 10 秒監控循環崩潰
                         print(f"[Supabase 傳送失敗]: {e}")
 
-            
+            if show_tri and 'TRI' in st.session_state.odds_dict and not st.session_state.odds_dict['TRI'].empty:
+                st.markdown("### 三重彩 (單T) 賠率排名")
+                tables = top(st.session_state.odds_dict['TRI'], st.session_state.investment_dict['TRI'], 'TRI')
+                if tables["main_table"]:
+                    st.write(tables["main_table"].to_html(), unsafe_allow_html=True)
+                if tables.get("notice_table"):
+                    st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
+           
             time.sleep(time_delay)
         
 
