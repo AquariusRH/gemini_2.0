@@ -1430,9 +1430,9 @@ def analyze_tce_investment(
     # ------------------------------------------
 
     def format_difference(difference):
-    if pd.isna(difference):
-        return "-"
-    return f"{float(difference) / 1000:+,.2f}K"
+        if pd.isna(difference):
+            return "-"
+        return f"{float(difference) / 1000:+,.2f}K"
 
 
     display_df = summary_df[
