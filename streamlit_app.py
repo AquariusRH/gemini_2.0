@@ -1272,21 +1272,6 @@ def analyze_tce_investment(tce_df, race_no):
         "latest_time": latest_time
     }
 
-
-# ============================================================
-# 6. 主程式呼叫
-# ============================================================
-
-# time_now 應與 save_odds_data(time_now, odds) 使用相同時間
-# 例如：
-# time_now = datetime.now() + timedelta(hours=8)
-#
-# request_tce_investment(Date, place, race_no, time_now)
-
-tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
-tce_result = analyze_tce_investment(tce_df, race_no)
-
-
 # ==================== 3. 繪圖函數 (簡化版) ====================
 def print_bar_chart(time_now):
   post_time = st.session_state.post_time_dict[race_no]
@@ -3828,22 +3813,8 @@ if monitoring_on:
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
         
             # 使用與 odds_dict 相同的更新時間
-            request_tce_investment(
-                Date,
-                place,
-                race_no,
-                time_now
-            )
-            
-            tce_df = st.session_state.get(
-                "tce_investment_df",
-                pd.DataFrame()
-            )
-            
-            tce_analysis = analyze_tce_investment(
-                tce_df=tce_df,
-                race_no=race_no
-            )
+            tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
+            tce_result = analyze_tce_investment(tce_df, race_no)
             time.sleep(time_delay)
         
 
