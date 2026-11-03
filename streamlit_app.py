@@ -762,8 +762,14 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
     
     headers = {
         "Content-Type": "application/json",
-        "Origin": "https://bet.hkjc.com",
-        "Referer": "https://bet.hkjc.com/"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0",
+        "Referer": "https://racing.hkjc.com/racing/information/Chinese/Trainers/TrainerRanking.aspx",
+        "Origin": "https://racing.hkjc.com",
+        "Accept": "*/*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site"
     }
     
     try:
