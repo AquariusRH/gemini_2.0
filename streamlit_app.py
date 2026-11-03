@@ -3134,7 +3134,7 @@ if monitoring_on:
                 save_odds_data(time_now,odds)
                 save_investment_data(time_now,investments,odds)
                 get_overall_investment(time_now,investments)
-                weird_data(investments)
+                weird_data(time_now, investments, odds, methodlist)
                 change_overall(time_now)
                 # 由於篇幅限制，假設已運行
                 st.session_state.last_update = time_now
