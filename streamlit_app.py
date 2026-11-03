@@ -92,9 +92,7 @@ def init_session_state():
         'top_4_history': [],
         'horse_history': {},
         'high_moneyflow_alerts': pd.DataFrame(columns=["分鐘","時間", "馬號", "當刻賠率", "moneyflow"]),
-        'tce_invest': pd.DataFrame(),
-        'tce_invest_update_time': None,
-        'tce_invest_race': {}
+        'tce_investment_df': pd.DataFrame(),
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -745,7 +743,82 @@ def change_overall(time_now):
         [st.session_state.diff_dict['overall'], total_investment_df]
     )
 
-
+def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataFrame:
+    """請求三重彩投注額，並存進 st.session_state['tce_investment_df']"""
+    url = "https://info.cld.hkjc.com/graphql/base/"
+    
+    payload = {
+        "operationName": "sp4e_racing_pmPool",
+        "variables": {
+            "date": date,
+            "venueCode": venue_code,
+            "raceNo": race_no,
+            "oddsTypes": ["TCEInvest"]
+        },
+        "query": """
+        query sp4e_racing_pmPool($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+          raceMeetings(date: $date, venueCode: $venueCode) {
+            pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
+              oddsType
+              lastUpdateTime
+              oddsNodes {
+                combString
+                bankerOdds {
+                  combString
+                  oddsValue
+                }
+              }
+            }
+          }
+        }
+        """
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Origin": "https://bet.hkjc.com",
+        "Referer": "https://bet.hkjc.com/"
+    }
+    
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        meetings = data.get("data", {}).get("raceMeetings", [])
+        if not meetings:
+            st.session_state["tce_investment_df"] = pd.DataFrame()
+            return pd.DataFrame()
+        
+        pools = meetings[0].get("pmPools", [])
+        tce_pool = next((p for p in pools if p.get("oddsType") == "TCEInvest"), None)
+        
+        if not tce_pool or not tce_pool.get("oddsNodes"):
+            st.session_state["tce_investment_df"] = pd.DataFrame()
+            return pd.DataFrame()
+        
+        rows = []
+        for node in tce_pool["oddsNodes"]:
+            horse = node.get("combString")
+            inv = {b["combString"]: int(b["oddsValue"] or 0) for b in node.get("bankerOdds", [])}
+            rows.append({
+                "馬號": horse,
+                "第一名": inv.get("1", 0),
+                "第二名": inv.get("2", 0),
+                "第三名": inv.get("3", 0),
+            })
+        
+        df = pd.DataFrame(rows)
+        df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
+        df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
+        
+        st.session_state["tce_investment_df"] = df
+        return df
+    
+    except Exception as e:
+        st.warning(f"TCEInvest 請求失敗: {e}")
+        st.session_state["tce_investment_df"] = pd.DataFrame()
+        return pd.DataFrame()
 # ==================== 3. 繪圖函數 (簡化版) ====================
 def print_bar_chart(time_now):
   post_time = st.session_state.post_time_dict[race_no]
@@ -3285,8 +3358,9 @@ if monitoring_on:
                     st.write(tables["main_table"].to_html(), unsafe_allow_html=True)
                 if tables.get("notice_table"):
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
-
-            #print_tce_df()
+        
+            request_tce_investment(date, venue_code, race_no)
+            tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
             time.sleep(time_delay)
         
 
