@@ -95,7 +95,7 @@ def init_session_state():
         'tce_invest': pd.DataFrame(),
         'tce_invest_update_time': None,
         'tce_invest_race': {}
-    },
+    }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
