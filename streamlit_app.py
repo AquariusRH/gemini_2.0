@@ -1450,14 +1450,14 @@ def analyze_tce_investment(
     with col1:
         st.metric(
             "最新 TCE 總投注額",
-            f"{latest_total / 1000:,.2f}K"
+            f"{latest_total / 1000:,.0f}K"
         )
     
     with col2:
         if pd.notna(three_min_total_change):
             st.metric(
                 "三分鐘實際資金變化",
-                f"{three_min_total_change / 1000:+,.2f}K"
+                f"{three_min_total_change / 1000:+,.0f}K"
             )
         else:
             st.metric(
@@ -1469,7 +1469,7 @@ def analyze_tce_investment(
         if pd.notna(predicted_total_change):
             st.metric(
                 f"預測未來 {forecast_minutes} 分鐘",
-                f"{predicted_total_change / 1000:+,.2f}K"
+                f"{predicted_total_change / 1000:+,.0f}K"
             )
         else:
             st.metric(
@@ -1552,17 +1552,18 @@ def analyze_tce_investment(
     
     # 顯示 K 單位
     styled_df = display_df.style.format({
-        "三分鐘前總投注額": "{:,.2f}K",
-        "最新總投注額": "{:,.2f}K",
-        "三分鐘資金變化": "{:+,.2f}K",
-        "預測資金變化": "{:+,.2f}K",
-        "預測後總投注額": "{:,.2f}K"
+        "三分鐘前總投注額": "{:,.0f}K",
+        "最新總投注額": "{:,.0f}K",
+        "三分鐘資金變化": "{:+,.0f}K",
+        "預測資金變化": "{:+,.0f}K",
+        "預測後總投注額": "{:,.0f}K"
     }, na_rep="-")
     
     st.dataframe(
         styled_df,
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
+        on_select="ignore"
     )
 
     # ==========================================
