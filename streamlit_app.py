@@ -216,6 +216,8 @@ def get_odds_data(Date, place, race_no, methodlist):
     for meeting in data.get("data", {}).get("raceMeetings") or []:
         for pool in meeting.get("pmPools") or []:
             odds_type = pool.get("oddsType")
+            nodes = pool.get("oddsNodes") or []
+            st.write(f"DEBUG pool={odds_type} status={pool.get('status')} sell={pool.get('sellStatus')} nodes={len(nodes)}")
             if odds_type not in odds_values:
                 continue
 
