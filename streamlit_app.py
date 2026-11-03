@@ -2183,7 +2183,7 @@ with st.sidebar:
     show_henery = st.toggle("🚀 顯示Henery Model 預測", key="show_henery", value=True)
     save_db = st.toggle("📜儲存database", key="save_db", value=False)
     show_qin_overall_heat_table = st.toggle("🎯儲存連贏圖", key="show_qin_overall_heat_table", value=False)
-    show_tri = st.toggle("🎯 顯示三重彩 (TRI) 排名", key="show_tri", value=True)
+    show_tri = st.toggle("🎯 顯示單T (TRI) 排名", key="show_tri", value=False)
 # --- 賽事資料加載 ---
 @st.cache_data(ttl=3600)
 def fetch_race_card(date_str, venue):
