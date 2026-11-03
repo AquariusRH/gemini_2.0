@@ -809,7 +809,17 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
         df = pd.DataFrame(rows)
         df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
         df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
-        
+        df = df.set_index("馬號")
+
+        # 三個名次的投注額全部為 0，就視為退出馬匹，不顯示
+        df = df[
+            ~(
+                (df["第一名"] == 0) &
+                (df["第二名"] == 0) &
+                (df["第三名"] == 0)
+            )
+        ]
+
         st.session_state["tce_investment_df"] = df
         return df
     
