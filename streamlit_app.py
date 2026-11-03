@@ -720,12 +720,12 @@ def weird_data(investments):
         diff = (latest_investment - expected_investment).round(0)
         
         if method in ['WIN', 'PLA']:
-             Replace _append with pd.concat
+             #Replace _append with pd.concat
             st.session_state.diff_dict[method] = pd.concat(
                 [st.session_state.diff_dict[method], diff]
             )
         elif method in ['QIN', 'QPL']:
-             Replace _append with pd.concat
+             #Replace _append with pd.concat
             combined_diff = investment_combined(time_now, method, diff)
             st.session_state.diff_dict[method] = pd.concat(
                 [st.session_state.diff_dict[method], combined_diff]
