@@ -3235,7 +3235,8 @@ if monitoring_on:
                 
             if show_henery:
                 print_henery_model(gamma=1.18)
-
+            st.write("TRI 注數:", len(odds_values.get("TRI") or []))
+            st.write("TRI 前5筆:", (odds_values.get("TRI") or [])[:5])
             if save_db:
                 # --- 策略 B：常規賠率 Snapshot 降頻寫入 (例如每 60 秒一次) ---
                 current_timestamp = time.time()
@@ -3271,7 +3272,7 @@ if monitoring_on:
                         # 加上 try-except 避免 DB 異常導致 10 秒監控循環崩潰
                         print(f"[Supabase 傳送失敗]: {e}")
 
-            st.write(st.session_state.odds_dict['TRI'])
+            
             time.sleep(time_delay)
         
 
