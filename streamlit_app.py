@@ -3811,6 +3811,7 @@ if monitoring_on:
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
         
             # 使用與 odds_dict 相同的更新時間
+            request_tce_investment(Date,place,race_no,time_now)
             tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
             tce_result = analyze_tce_investment(tce_df, race_no)
             time.sleep(time_delay)
