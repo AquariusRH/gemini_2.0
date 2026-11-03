@@ -1099,23 +1099,30 @@ def analyze_tce_investment(
     
     # 合併顯示在一句 Markdown 中
     st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
-    # ==========================================
-    # 1. 檢查 TCE 資料
-    # ==========================================
+    # --------------------------------------------------------
+    # 檢查資料
+    # --------------------------------------------------------
 
     if tce_df is None or tce_df.empty:
-        st.info("目前沒有 TCE 投注數據")
+
+        st.warning("暫時沒有 TCE 投注資料。")
+
         return None
 
     if not isinstance(tce_df.columns, pd.MultiIndex):
-        st.error("TCE DataFrame 必須使用 MultiIndex Columns")
-        return None
 
-    if tce_df.columns.nlevels != 2:
-        st.error("TCE Columns 必須有兩個層級：馬號及名次")
+        st.warning(
+            "TCE DataFrame 欄位格式不正確，"
+            "預期欄位為 (馬號, 名次) 的 MultiIndex。"
+        )
+
         return None
 
     df = tce_df.copy()
+
+    # --------------------------------------------------------
+    # 整理時間 Index
+    # --------------------------------------------------------
 
     df.index = pd.to_datetime(
         df.index,
@@ -1123,104 +1130,136 @@ def analyze_tce_investment(
     )
 
     df = df.loc[~df.index.isna()]
+
+    if df.empty:
+
+        st.warning("TCE 資料沒有有效時間。")
+
+        return None
+
     df = df.sort_index()
 
-    df = df[
-        ~df.index.duplicated(keep="last")
-    ]
+    # 相同時間如有重複資料，保留最後一筆
+    df = df[~df.index.duplicated(keep="last")]
+
+    # 最新資料時間
+    latest_time = df.index[-1]
+
+    # 計算一分鐘及三分鐘前的目標時間
+    one_min_ago = latest_time - pd.Timedelta(minutes=1)
+
+    three_min_ago = latest_time - pd.Timedelta(minutes=3)
+
+    # --------------------------------------------------------
+    # 取得馬名及獨贏賠率
+    # --------------------------------------------------------
+
+    horse_name_map, win_odds_map = get_tce_horse_metadata(
+        race_no
+    )
+
+    # --------------------------------------------------------
+    # 整理 TCE 欄位
+    #
+    # MultiIndex Columns:
+    # Level 0 = 馬號
+    # Level 1 = 名次
+    #
+    # 例如：
+    # (1, 第一名)
+    # (1, 第二名)
+    # (1, 第三名)
+    # (2, 第一名)
+    # ...
+    # --------------------------------------------------------
+
+    horse_columns = {}
 
     for col in df.columns:
-        df[col] = pd.to_numeric(
-            df[col],
+
+        if not isinstance(col, tuple) or len(col) < 1:
+            continue
+
+        horse_no = normalize_tce_horse_no(col[0])
+
+        if not horse_no:
+            continue
+
+        if horse_no not in horse_columns:
+            horse_columns[horse_no] = []
+
+        horse_columns[horse_no].append(col)
+
+    if not horse_columns:
+
+        st.warning("找不到有效的 TCE 馬匹資料。")
+
+        return None
+
+    # --------------------------------------------------------
+    # 逐匹馬分析投注額
+    # --------------------------------------------------------
+
+    results = []
+
+    for horse_no, columns in horse_columns.items():
+
+        # 取出該馬匹所有名次的投注額
+        horse_df = df[columns].copy()
+
+        # 轉換成數值
+        horse_df = horse_df.apply(
+            pd.to_numeric,
             errors="coerce"
         )
 
-    if df.empty:
-        st.info("沒有有效 TCE 時間資料")
-        return None
-
-    # ==========================================
-    # 2. 取得馬名及獨贏賠率
-    # ==========================================
-
-    horse_name_map, win_odds_map = (
-        get_tce_horse_metadata(race_no)
-    )
-
-    # ==========================================
-    # 3. 設定三個時間點
-    # ==========================================
-
-    latest_time = df.index[-1]
-
-    one_min_ago = (
-        latest_time - pd.Timedelta(minutes=1)
-    )
-
-    three_min_ago = (
-        latest_time - pd.Timedelta(minutes=3)
-    )
-
-    summary_rows = []
-
-    # ==========================================
-    # 4. 逐匹馬計算投注額
-    # ==========================================
-
-    horse_numbers = sorted(
-        {
-            normalize_tce_horse_no(col[0])
-            for col in df.columns
-            if normalize_tce_horse_no(col[0])
-        },
-        key=lambda x: (
-            0, int(x)
-        ) if x.isdigit() else (1, x)
-    )
-
-    for horse_no in horse_numbers:
-
-        # 找出該馬匹三個名次的 Columns
-        horse_cols = [
-            col for col in df.columns
-            if normalize_tce_horse_no(col[0]) == horse_no
-        ]
-
-        if not horse_cols:
-            continue
-
-        # 三個名次投注額合計
-        horse_history = (
-            df[horse_cols]
-            .sum(axis=1, min_count=1)
-            .dropna()
-            .sort_index()
+        # 將第一名、第二名及第三名投注額加總
+        horse_history = horse_df.sum(
+            axis=1,
+            min_count=1
         )
+
+        horse_history = horse_history.dropna().sort_index()
 
         if horse_history.empty:
             continue
 
-        # 必須有最新時間的資料
+        # ----------------------------------------------------
+        # 最新投注額
+        # ----------------------------------------------------
+
         if latest_time not in horse_history.index:
             continue
 
-        latest_amount = float(
-            horse_history.loc[latest_time]
+        latest_amount = horse_history.loc[latest_time]
+
+        if pd.isna(latest_amount):
+            continue
+
+        # ----------------------------------------------------
+        # 一分鐘前投注額
+        # ----------------------------------------------------
+
+        one_min_amount = get_tce_amount_at_or_before(
+            horse_history,
+            one_min_ago
         )
 
-        # ------------------------------------------
-        # A. 取得一分鐘前最近一筆有效資料
-        # ------------------------------------------
+        # ----------------------------------------------------
+        # 三分鐘前投注額
+        # ----------------------------------------------------
 
-        one_min_history = horse_history[
-            horse_history.index <= one_min_ago
-        ]
+        three_min_amount = get_tce_amount_at_or_before(
+            horse_history,
+            three_min_ago
+        )
 
-        if not one_min_history.empty:
+        # ----------------------------------------------------
+        # 計算資金差距
+        # 最新投注額 - 過去投注額
+        # ----------------------------------------------------
 
-            one_min_amount = float(
-                one_min_history.iloc[-1]
-            )
+        if pd.notna(one_min_amount):
 
             one_min_change = (
                 latest_amount - one_min_amount
@@ -1228,22 +1267,9 @@ def analyze_tce_investment(
 
         else:
 
-            one_min_amount = np.nan
             one_min_change = np.nan
 
-        # ------------------------------------------
-        # B. 取得三分鐘前最近一筆有效資料
-        # ------------------------------------------
-
-        three_min_history = horse_history[
-            horse_history.index <= three_min_ago
-        ]
-
-        if not three_min_history.empty:
-
-            three_min_amount = float(
-                three_min_history.iloc[-1]
-            )
+        if pd.notna(three_min_amount):
 
             three_min_change = (
                 latest_amount - three_min_amount
@@ -1251,32 +1277,27 @@ def analyze_tce_investment(
 
         else:
 
-            three_min_amount = np.nan
             three_min_change = np.nan
 
-        # ------------------------------------------
-        # C. 馬名
-        # ------------------------------------------
+        # ----------------------------------------------------
+        # 馬名及獨贏賠率
+        # ----------------------------------------------------
 
         horse_name = horse_name_map.get(
             horse_no,
             ""
         )
 
-        # ------------------------------------------
-        # D. 最新獨贏賠率
-        # ------------------------------------------
-
         win_odds = win_odds_map.get(
             horse_no,
             np.nan
         )
 
-        # ------------------------------------------
-        # E. 儲存結果
-        # ------------------------------------------
+        # ----------------------------------------------------
+        # 儲存結果
+        # ----------------------------------------------------
 
-        summary_rows.append({
+        results.append({
 
             "馬號": horse_no,
 
@@ -1296,198 +1317,155 @@ def analyze_tce_investment(
 
         })
 
-    # ==========================================
-    # 5. 建立 DataFrame
-    # ==========================================
+    # --------------------------------------------------------
+    # 建立分析 DataFrame
+    # --------------------------------------------------------
 
-    horse_summary = pd.DataFrame(summary_rows)
+    if not results:
 
-    if horse_summary.empty:
-        st.info("沒有可供分析的馬匹資料")
+        st.warning(
+            "沒有足夠的 TCE 投注資料進行分析。"
+        )
+
         return None
 
-    # ==========================================
-    # 6. 計算整體指標
-    # ==========================================
+    summary_df = pd.DataFrame(results)
 
-    latest_total = horse_summary[
-        "最新總投注額"
-    ].sum()
-
-    one_min_total_change = (
-        horse_summary["一分鐘資金變化"]
-        .sum(min_count=1)
-    )
-
-    three_min_total_change = (
-        horse_summary["三分鐘資金變化"]
-        .sum(min_count=1)
-    )
-
-    # ==========================================
-    # 7. 排序
-    # ==========================================
-
-    # 第一排序：一分鐘真正資金變化，由高至低
+    # --------------------------------------------------------
+    # 排序
+    #
+    # 第一排序：一分鐘資金變化，由高至低
     # 第二排序：獨贏賠率，由低至高
+    #
+    # 不限制馬匹數量
+    # --------------------------------------------------------
 
-    horse_summary = horse_summary.sort_values(
+    summary_df = summary_df.sort_values(
+
         by=[
             "一分鐘資金變化",
             "獨贏賠率"
         ],
+
         ascending=[
             False,
             True
         ],
+
         na_position="last",
+
         kind="mergesort"
+
     ).reset_index(drop=True)
 
-    # ==========================================
-    # 8. 顯示整體指標
-    # ==========================================
+    # --------------------------------------------------------
+    # 計算總投注額及資金變化
+    # --------------------------------------------------------
+
+    latest_total = summary_df[
+        "最新總投注額"
+    ].sum(min_count=1)
+
+    one_min_total_change = summary_df[
+        "一分鐘資金變化"
+    ].sum(min_count=1)
+
+    three_min_total_change = summary_df[
+        "三分鐘資金變化"
+    ].sum(min_count=1)
+
+    # --------------------------------------------------------
+    # 顯示總投注額及資金變化
+    # --------------------------------------------------------
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
 
         st.metric(
-            "最新 TCE 總投注額",
-            f"{latest_total / 1000:,.2f}K"
+            "最新總投注",
+            format_tce_amount(latest_total)
         )
 
     with col2:
 
-        if pd.notna(three_min_total_change):
-
-            st.metric(
-                "三分鐘實際資金變化",
-                f"{three_min_total_change / 1000:+,.2f}K"
+        st.metric(
+            "三分鐘資金變化",
+            format_tce_difference(
+                three_min_total_change
             )
-
-        else:
-
-            st.metric(
-                "三分鐘實際資金變化",
-                "-"
-            )
+        )
 
     with col3:
 
-        if pd.notna(one_min_total_change):
-
-            st.metric(
-                "一分鐘實際資金變化",
-                f"{one_min_total_change / 1000:+,.2f}K"
+        st.metric(
+            "一分鐘資金變化",
+            format_tce_difference(
+                one_min_total_change
             )
+        )
 
-        else:
+    # --------------------------------------------------------
+    # 建立顯示表格
+    #
+    # 三分鐘前：只顯示資金差距
+    # 一分鐘前：只顯示資金差距
+    # 最新總投注：顯示最新投注額
+    # --------------------------------------------------------
 
-            st.metric(
-                "一分鐘實際資金變化",
-                "-"
-            )
+    display_df = pd.DataFrame()
 
-    # ==========================================
-    # 9. 顯示資金流入排名
-    # ==========================================
+    display_df["馬號"] = summary_df["馬號"]
 
-    st.markdown("### 一分鐘資金流入排名")
+    display_df["馬名"] = summary_df["馬名"]
+
+    display_df["獨贏賠率"] = summary_df[
+        "獨贏賠率"
+    ].apply(format_tce_odds)
+
+    # 三分鐘資金差距
+    display_df["三分鐘前"] = summary_df[
+        "三分鐘資金變化"
+    ].apply(format_tce_difference)
+
+    # 一分鐘資金差距
+    display_df["一分鐘前"] = summary_df[
+        "一分鐘資金變化"
+    ].apply(format_tce_difference)
+
+    # 最新總投注額
+    display_df["最新總投注"] = summary_df[
+        "最新總投注額"
+    ].apply(format_tce_amount)
+
+    # --------------------------------------------------------
+    # 顯示表格
+    # --------------------------------------------------------
 
     st.caption(
-        "排序：一分鐘實際資金變化（高至低）"
-        " → 獨贏賠率（低至高）。"
-        "括號內為最新投注額減去該時間點投注額。"
+        "按一分鐘資金變化由高至低排序；"
+        "正數代表投注增加，負數代表投注減少。"
     )
 
-    display_df = horse_summary.copy()
-
-    # ------------------------------------------
-    # 獨贏賠率格式
-    # ------------------------------------------
-
-    def format_win_odds(value):
-
-        if pd.isna(value):
-            return "-"
-
-        try:
-
-            value = float(value)
-
-            if np.isinf(value):
-                return "SCR"
-
-            return f"{value:.1f}"
-
-        except (TypeError, ValueError):
-
-            return "-"
-
-    # ------------------------------------------
-    # 投注額 + 與最新投注額的差距
-    # ------------------------------------------
-
-    def format_difference(difference):
-        if pd.isna(difference):
-            return "-"
-        return f"{float(difference) / 1000:+,.2f}K"
-
-
-    display_df = summary_df[
-        ["馬號", "馬名", "獨贏賠率"]
-    ].copy()
-    
-    # 只顯示與最新總投注額的差距
-    display_df["三分鐘前"] = summary_df["三分鐘資金變化"].apply(
-        format_difference
-    )
-    
-    display_df["一分鐘前"] = summary_df["一分鐘資金變化"].apply(
-        format_difference
-    )
-    
-    display_df["最新總投注"] = summary_df["最新總投注額"].apply(
-        lambda x: "-" if pd.isna(x) else f"{float(x) / 1000:,.2f}K"
-    )
-
-    display_df["獨贏賠率"] = (
-        display_df["獨贏賠率"]
-        .map(format_win_odds)
-    )
-
-    # ------------------------------------------
-    # 最終表格欄位及順序
-    # ------------------------------------------
-
-    display_df = display_df[
-        [
-            "馬號",
-            "馬名",
-            "獨贏賠率",
-            "三分鐘前",
-            "一分鐘前",
-            "最新總投注"
-        ]
-    ]
-
-    # 靜態表格
     st.table(display_df)
 
-    # ==========================================
-    # 10. 回傳分析資料
-    # ==========================================
+    # --------------------------------------------------------
+    # 回傳分析結果
+    # --------------------------------------------------------
 
     return {
 
-        "horse_summary": horse_summary,
+        "horse_summary": summary_df,
+
+        "display_df": display_df,
 
         "latest_total": latest_total,
 
         "one_min_total_change": one_min_total_change,
 
-        "three_min_total_change": three_min_total_change
+        "three_min_total_change": three_min_total_change,
+
+        "latest_time": latest_time
 
     }
 
