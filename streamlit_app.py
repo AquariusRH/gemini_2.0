@@ -3361,7 +3361,7 @@ if monitoring_on:
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
 
                         # 取得三重彩投注額
-            tce_df = get_tce_invest_data(date, place, race_no)
+            tce_df = get_tce_invest_data(str(Date), place, int(race_no))
             
             if not tce_df.empty:
                 st.subheader("三重彩投注額 (TCEInvest)")
