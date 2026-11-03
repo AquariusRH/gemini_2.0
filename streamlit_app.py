@@ -1360,95 +1360,66 @@ def analyze_tce_investment(
         na_position="last"
     )
 
+    
     # ==========================================
-    # 6. 顯示整體指標
-    # ==========================================
-
-    latest_total = detail_df[
-        "最新投注額"
-    ].sum()
-
-    predicted_total_change = (
-        detail_df["預測投注變化"]
-        .sum(min_count=1)
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            "目前三重彩投注額",
-            f"{latest_total:,.0f}"
-        )
-
-    with col2:
-        if pd.notna(predicted_total_change):
-            st.metric(
-                f"預測未來 {forecast_minutes} 分鐘變化",
-                f"{predicted_total_change:+,.0f}"
-            )
-        else:
-            st.metric(
-                "預測資金變化",
-                "資料不足"
-            )
-
-    with col3:
-        st.metric(
-            "分析馬匹數",
-            detail_df["馬號"].nunique()
-        )
-
-    st.caption(
-        "馬名來自已載入的本地／海外排位表；"
-        "獨贏賠率來自 WIN odds_dict 最新更新。"
-    )
-
-    # ==========================================
-    # 7. 格式化獨贏賠率
+    # 6. 只顯示預測資金流入排名
     # ==========================================
 
-    def format_win_odds(value):
-
-        if pd.isna(value):
-            return "-"
-
-        try:
-            value = float(value)
-
-            if np.isinf(value):
-                return "SCR"
-
-            return f"{value:.1f}"
-
-        except (TypeError, ValueError):
-            return "-"
-
-    # ==========================================
-    # 8. 預測資金流入排名
-    # ==========================================
-
-    st.markdown("### 預測資金流入排名")
+    st.markdown("### 🏆 預測資金流入排名")
 
     valid_summary = horse_summary.dropna(
         subset=["預測資金變化"]
-    )
+    ).copy()
 
     if not valid_summary.empty:
 
-        display_summary = (
-            valid_summary.head(top_n).copy()
-        )
+        display_summary = valid_summary.head(top_n).copy()
+
+        # 獨贏賠率格式
+        def format_win_odds(value):
+            if pd.isna(value):
+                return "-"
+
+            try:
+                value = float(value)
+
+                if np.isinf(value):
+                    return "SCR"
+
+                return f"{value:.1f}"
+
+            except (TypeError, ValueError):
+                return "-"
 
         display_summary["獨贏賠率"] = (
             display_summary["獨贏賠率"]
             .map(format_win_odds)
         )
 
+        # 重新排列欄位
+        display_summary = display_summary[
+            [
+                "馬號",
+                "馬名",
+                "獨贏賠率",
+                "最新總投注額",
+                "預測資金變化",
+                "預測後總投注額",
+                "可預測名次數"
+            ]
+        ]
+
+        display_summary.insert(
+            0,
+            "排名",
+            range(1, len(display_summary) + 1)
+        )
+
+        # 顯示表格
         styled_summary = display_summary.style.format({
             "最新總投注額": "{:,.0f}",
             "預測資金變化": "{:+,.0f}",
-            "預測後總投注額": "{:,.0f}",
+            "預測後總投注額": "{:,.0f}"
         })
 
         st.dataframe(
@@ -1458,148 +1429,15 @@ def analyze_tce_investment(
         )
 
     else:
-        st.info("目前有效時間點不足，未能作出預測。")
+        st.info(
+            "目前有效時間點不足，未能計算預測資金流入排名。"
+        )
 
     # ==========================================
-    # 9. 各馬匹三個名次詳細分析
-    # ==========================================
-
-    st.markdown("### 各馬匹三個名次詳細分析")
-
-    detail_display = detail_df.sort_values(
-        "預測投注變化",
-        ascending=False,
-        na_position="last"
-    ).copy()
-
-    detail_display["獨贏賠率"] = (
-        detail_display["獨贏賠率"]
-        .map(format_win_odds)
-    )
-
-    styled_detail = detail_display.style.format({
-        "最新投注額": "{:,.0f}",
-        "最近一次變化": "{:+,.0f}",
-        "每分鐘變化速度": "{:+,.1f}",
-        "預測投注變化": "{:+,.1f}",
-        "預測投注額": "{:,.1f}",
-        "預測增幅(%)": "{:+.1f}%"
-    })
-
-    st.dataframe(
-        styled_detail,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # ==========================================
-    # 10. 投注額歷史及預測走勢圖
-    # ==========================================
-
-    st.markdown("### 馬匹投注額走勢及預測")
-
-    fig = go.Figure()
-
-    chart_horses = (
-        valid_summary.head(5)["馬號"].tolist()
-        if not valid_summary.empty
-        else []
-    )
-
-    for horse in chart_horses:
-
-        horse_cols = [
-            c for c in df.columns
-            if str(c[0]).strip() == str(horse)
-        ]
-
-        if not horse_cols:
-            continue
-
-        history = (
-            df[horse_cols]
-            .sum(axis=1, min_count=1)
-            .dropna()
-        )
-
-        if history.empty:
-            continue
-
-        horse_name = horse_name_map.get(
-            str(horse), ""
-        )
-
-        label = (
-            f"{horse} {horse_name}"
-            if horse_name
-            else f"馬號 {horse}"
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=history.index,
-                y=history.values,
-                mode="lines",
-                name=f"{label} 實際投注"
-            )
-        )
-
-        summary_row = horse_summary[
-            horse_summary["馬號"] == horse
-        ]
-
-        if summary_row.empty:
-            continue
-
-        expected_change = summary_row[
-            "預測資金變化"
-        ].iloc[0]
-
-        if pd.isna(expected_change):
-            continue
-
-        last_time = history.index[-1]
-        last_value = history.iloc[-1]
-
-        future_time = (
-            last_time
-            + pd.Timedelta(minutes=forecast_minutes)
-        )
-
-        future_value = max(
-            last_value + expected_change,
-            0
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=[last_time, future_time],
-                y=[last_value, future_value],
-                mode="lines+markers",
-                line=dict(dash="dash"),
-                name=f"{label} 預測"
-            )
-        )
-
-    fig.update_layout(
-        title="TCE 各馬匹總投注額走勢",
-        xaxis_title="更新時間",
-        yaxis_title="投注額",
-        hovermode="x unified",
-        height=500
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-    # ==========================================
-    # 11. 回傳分析結果
+    # 7. 回傳分析資料
     # ==========================================
 
     return {
-        "detail": detail_df,
         "horse_summary": horse_summary,
         "latest_total": latest_total,
         "predicted_total_change": predicted_total_change,
