@@ -3359,7 +3359,7 @@ if monitoring_on:
                 if tables.get("notice_table"):
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
         
-            request_tce_investment(date, venue_code, race_no)
+            request_tce_investment(Date, venue_code, race_no)
             tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
             time.sleep(time_delay)
         
