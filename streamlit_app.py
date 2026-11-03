@@ -809,7 +809,7 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
         df = pd.DataFrame(rows)
         horse_info_df = fetch_horse_age_only(date,venue_code,race_no)
 
-        if (horse_info_df is not Noneand not horse_info_df.emptyand "馬名" in horse_info_df.columns):
+        if horse_info_df is not None and not horse_info_df.emptyand "馬名" in horse_info_df.columns:
             # horse_info_df 的 Index 是馬號（編號）
             horse_name_map = horse_info_df["馬名"].to_dict()
             df["馬名"] = (df["馬號"].astype(str).str.strip().map(horse_name_map).fillna(""))
