@@ -807,15 +807,21 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
             })
         
         df = pd.DataFrame(rows)
-        # 呼叫現有 function 取得馬號及馬名
-        horse_info_df = fetch_horse_age_only(date, venue_code, race_no)
+        horse_info_df = fetch_horse_age_only(date,venue_code,race_no)
 
-        if horse_info_df is not None and not horse_info_df.empty:
+        if (horse_info_df is not Noneand not horse_info_df.emptyand "馬名" in horse_info_df.columns):
+            # horse_info_df 的 Index 是馬號（編號）
             horse_name_map = horse_info_df["馬名"].to_dict()
+            df["馬名"] = (df["馬號"].astype(str).str.strip().map(horse_name_map).fillna(""))
+        else:
+            # 如果未能取得馬名，仍然保留投注額資料
+            df["馬名"] = ""
 
-            df["馬名"] = df["馬號"].astype(str).map(horse_name_map).fillna("")
-        
-        df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
+        # ==================================================
+        # 按馬號排序，並將馬號設定為 Index
+        # ==================================================
+
+        df["馬號_num"] = pd.to_numeric(df["馬號"],errors="coerce")
         df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
         df = df.set_index("馬號")
 
