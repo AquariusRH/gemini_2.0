@@ -704,29 +704,29 @@ def weird_data(time_now, investments, odds, methodlist):
             # st.error(f"Error in weird_data: {e}")
             pass
 
-def weird_data(investments):
-    for method in methodlist:
-        if st.session_state.investment_dict[method].empty:
-            continue
+#def weird_data(investments):
+    #for method in methodlist:
+        #if st.session_state.investment_dict[method].empty:
+            #continue
             
-        latest_investment = st.session_state.investment_dict[method].tail(1).values
-        last_time_odds = st.session_state.odds_dict[method].tail(2).head(1)
+        #latest_investment = st.session_state.investment_dict[method].tail(1).values
+        #last_time_odds = st.session_state.odds_dict[method].tail(2).head(1)
         
         # Calculation logic remains the same
-        expected_investment = investments[method][0] / 1000 / last_time_odds
-        diff = (latest_investment - expected_investment).round(0)
+        #expected_investment = investments[method][0] / 1000 / last_time_odds
+        #diff = (latest_investment - expected_investment).round(0)
         
-        if method in ['WIN', 'PLA']:
+        #if method in ['WIN', 'PLA']:
             # Replace _append with pd.concat
-            st.session_state.diff_dict[method] = pd.concat(
-                [st.session_state.diff_dict[method], diff]
+           # st.session_state.diff_dict[method] = pd.concat(
+            #    [st.session_state.diff_dict[method], diff]
             )
-        elif method in ['QIN', 'QPL']:
+      #  elif method in ['QIN', 'QPL']:
             # Replace _append with pd.concat
-            combined_diff = investment_combined(time_now, method, diff)
-            st.session_state.diff_dict[method] = pd.concat(
-                [st.session_state.diff_dict[method], combined_diff]
-            )
+       #     combined_diff = investment_combined(time_now, method, diff)
+       #     st.session_state.diff_dict[method] = pd.concat(
+        #        [st.session_state.diff_dict[method], combined_diff]
+        #    )
     
 def change_overall(time_now):
     total_investment = 0
