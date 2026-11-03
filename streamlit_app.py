@@ -1077,11 +1077,25 @@ def analyze_tce_investment(
     一分鐘前投注額、最新投注額、一分鐘資金變化
     """
 
-    import numpy as np
-    import pandas as pd
-
     st.subheader("三重彩一分鐘資金流分析")
+    # --- 1. 時間處理與合併顯示 ---
+    HK_TZ = timezone(timedelta(hours=8))
+    now = datetime.now(HK_TZ)
+    
+    # 獲取開跑倒數
+    post_time_raw = st.session_state.post_time_dict[race_no]
+    if post_time_raw:
+        post_time = post_time_raw.replace(tzinfo=HK_TZ) if post_time_raw.tzinfo is None else post_time_raw
+        seconds_left = (post_time - now).total_seconds()
+        time_str = "🏁 已開跑" if seconds_left <= 0 else f"⏳ 離開跑 {int(seconds_left // 60)} 分"
+    else:
+        time_str = "未載入"
 
+    # 獲取最後更新時間
+    last_upd = st.session_state.last_update.strftime('%H:%M:%S') if st.session_state.get('last_update') else "N/A"
+    
+    # 合併顯示在一句 Markdown 中
+    st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
     # ==========================================
     # 1. 檢查 TCE 資料
     # ==========================================
