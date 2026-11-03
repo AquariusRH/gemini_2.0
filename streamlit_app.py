@@ -113,8 +113,7 @@ HEADERS = {
 }
 
 # 白名單可用的 odds query（不要改欄位順序/空白也盡量別動）
-ODDS_QUERY = """
-query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+ODDS_QUERY = """query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
   raceMeetings(date: $date, venueCode: $venueCode) {
     pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
       id
@@ -148,8 +147,7 @@ query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo:
       }
     }
   }
-}
-"""
+}"""
 
 # 白名單可用的 investment query
 INV_QUERY = """
