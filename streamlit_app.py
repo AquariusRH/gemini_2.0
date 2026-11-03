@@ -3984,12 +3984,9 @@ if monitoring_on:
                 pd.DataFrame()
             )
             
-            # TCE 分析及顯示
             tce_analysis = analyze_tce_investment(
                 tce_df=tce_df,
                 race_no=race_no,
-                forecast_minutes=1,
-                recent_points=8,
                 top_n=10
             )
             time.sleep(time_delay)
