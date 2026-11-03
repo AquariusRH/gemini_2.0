@@ -743,29 +743,56 @@ def change_overall(time_now):
         [st.session_state.diff_dict['overall'], total_investment_df]
     )
 
-def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataFrame:
-    """請求三重彩投注額，並存進 st.session_state['tce_investment_df']"""
+def request_tce_investment(
+    date: str,
+    venue_code: str,
+    race_no: int,
+    time_now=None
+) -> pd.DataFrame:
+    """請求三重彩投注額，以時間為 Index、馬號及名次為 Columns"""
+
     if isinstance(date, (datetime, pd.Timestamp)):
         date = date.strftime("%Y-%m-%d")
     elif hasattr(date, "strftime"):
         date = date.strftime("%Y-%m-%d")
     else:
         date = str(date)
+
+    # 如果沒有傳入時間，就使用目前時間
+    if time_now is None:
+        time_now = datetime.now()
+
+    # 取得現有歷史 DataFrame
+    tce_df = st.session_state.get(
+        "tce_investment_df",
+        pd.DataFrame()
+    )
+
+    # 舊版 DataFrame 結構不符合新格式時，重新初始化
+    if (
+        not tce_df.empty
+        and (
+            not isinstance(tce_df.columns, pd.MultiIndex)
+            or tce_df.columns.nlevels != 2
+        )
+    ):
+        tce_df = pd.DataFrame()
+
     url = "https://info.cld.hkjc.com/graphql/base/"
-    
+
     payload = {
         "operationName": "sp4e_racing_pmPool",
         "variables": {
             "date": date,
             "venueCode": venue_code,
             "raceNo": race_no,
-            "oddsTypes": ["WIN","TCEInvest"]
+            "oddsTypes": ["WIN", "TCEInvest"]
         },
         "query": """
         query sp4e_racing_pmPool($date:String$venueCode:String$oddsTypes:[OddsType]$raceNo:Int){raceMeetings(date:$date venueCode:$venueCode){pmPools(oddsTypes:$oddsTypes raceNo:$raceNo){id status sellStatus oddsType lastUpdateTime oddsLastUpdateTime guarantee minTicketCost name_en name_ch leg{number races}cWinSelections{composite name_ch name_en starters}oddsNodes{combString oddsValue hotFavourite oddsDropValue bankerOdds{combString oddsValue}}}}}
         """
     }
-    
+
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0",
@@ -777,60 +804,147 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "same-site"
     }
-    
+
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        resp = requests.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=10
+        )
+
         resp.raise_for_status()
         data = resp.json()
-        
+
         meetings = data.get("data", {}).get("raceMeetings", [])
+
         if not meetings:
-            st.session_state["tce_investment_df"] = pd.DataFrame()
-            return pd.DataFrame()
-        
+            st.session_state["tce_investment_df"] = tce_df
+            return tce_df
+
         pools = meetings[0].get("pmPools", [])
-        tce_pool = next((p for p in pools if p.get("oddsType") == "TCEInvest"), None)
-        
+
+        tce_pool = next(
+            (p for p in pools if p.get("oddsType") == "TCEInvest"),
+            None
+        )
+
         if not tce_pool or not tce_pool.get("oddsNodes"):
-            st.session_state["tce_investment_df"] = pd.DataFrame()
-            return pd.DataFrame()
-        
-        rows = []
+            st.session_state["tce_investment_df"] = tce_df
+            return tce_df
+
+        # ==================================================
+        # 整理每匹馬的三個名次投注額
+        # ==================================================
+
+        tce_values = {}
+
         for node in tce_pool["oddsNodes"]:
-            horse = node.get("combString")
-            inv = {b["combString"]: int(b["oddsValue"] or 0) for b in node.get("bankerOdds", [])}
-            rows.append({
-                "馬號": horse,
-                "第一名": inv.get("1", 0),
-                "第二名": inv.get("2", 0),
-                "第三名": inv.get("3", 0),
-            })
-        
-        df = pd.DataFrame(rows)
+
+            horse = str(node.get("combString", "")).strip()
+
+            if not horse:
+                continue
+
+            inv = {
+                str(b.get("combString")): int(b.get("oddsValue") or 0)
+                for b in node.get("bankerOdds", [])
+            }
+
+            first = inv.get("1", 0)
+            second = inv.get("2", 0)
+            third = inv.get("3", 0)
+
+            # 三個名次全部為 0，就視為退出馬匹，不儲存
+            if first == 0 and second == 0 and third == 0:
+                continue
+
+            # 第一層：馬號
+            # 第二層：名次
+            tce_values[(horse, "第一名")] = first
+            tce_values[(horse, "第二名")] = second
+            tce_values[(horse, "第三名")] = third
+
+        # 沒有有效投注資料
+        if not tce_values:
+            st.session_state["tce_investment_df"] = tce_df
+            return tce_df
+
         # ==================================================
-        # 按馬號排序，並將馬號設定為 Index
+        # 建立當次時間的 DataFrame
         # ==================================================
 
-        df["馬號_num"] = pd.to_numeric(df["馬號"],errors="coerce")
-        df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
-        df = df.set_index("馬號")
+        new_df = pd.DataFrame(
+            [tce_values],
+            index=[time_now]
+        )
 
-        # 三個名次的投注額全部為 0，就視為退出馬匹，不顯示
-        df = df[
-            ~(
-                (df["第一名"] == 0) &
-                (df["第二名"] == 0) &
-                (df["第三名"] == 0)
+        new_df.columns = pd.MultiIndex.from_tuples(
+            new_df.columns,
+            names=["馬號", "名次"]
+        )
+
+        # ==================================================
+        # 將新資料加入歷史 DataFrame
+        # ==================================================
+
+        # 同一個 time_now 不重複新增
+        tce_df = tce_df.drop(
+            index=time_now,
+            errors="ignore"
+        )
+
+        tce_df = pd.concat(
+            [tce_df, new_df],
+            axis=0
+        )
+
+        # 不同時間可能出現不同馬號，合併所有 Columns
+        tce_df = tce_df.fillna(0)
+
+        # ==================================================
+        # 按照馬號及名次排序
+        # ==================================================
+
+        rank_order = {
+            "第一名": 1,
+            "第二名": 2,
+            "第三名": 3
+        }
+
+        sorted_columns = sorted(
+            tce_df.columns.tolist(),
+            key=lambda x: (
+                int(x[0]) if str(x[0]).isdigit() else 9999,
+                rank_order.get(x[1], 99)
             )
-        ]
+        )
 
-        st.session_state["tce_investment_df"] = df
-        return df
-    
+        tce_df = tce_df.reindex(
+            columns=pd.MultiIndex.from_tuples(
+                sorted_columns,
+                names=["馬號", "名次"]
+            )
+        )
+
+        # 按時間排序
+        tce_df = tce_df.sort_index()
+
+        # ==================================================
+        # 儲存歷史資料
+        # ==================================================
+
+        st.session_state["tce_investment_df"] = tce_df
+
+        return tce_df
+
     except Exception as e:
+
         st.warning(f"TCEInvest 請求失敗: {e}")
-        st.session_state["tce_investment_df"] = pd.DataFrame()
-        return pd.DataFrame()
+
+        st.session_state["tce_investment_df"] = tce_df
+
+        return tce_df
 # ==================== 3. 繪圖函數 (簡化版) ====================
 def print_bar_chart(time_now):
   post_time = st.session_state.post_time_dict[race_no]
