@@ -1448,42 +1448,33 @@ def analyze_tce_investment(
     col1, col2, col3 = st.columns(3)
 
     with col1:
-
         st.metric(
             "最新 TCE 總投注額",
-            f"{latest_total:,.0f}"
+            f"{latest_total / 1000:,.2f}K"
         )
-
+    
     with col2:
-
         if pd.notna(three_min_total_change):
-
             st.metric(
                 "三分鐘實際資金變化",
-                f"{three_min_total_change:+,.0f}"
+                f"{three_min_total_change / 1000:+,.2f}K"
             )
-
         else:
-
             st.metric(
                 "三分鐘實際資金變化",
-                "資料不足"
+                "-"
             )
-
+    
     with col3:
-
         if pd.notna(predicted_total_change):
-
             st.metric(
                 f"預測未來 {forecast_minutes} 分鐘",
-                f"{predicted_total_change:+,.0f}"
+                f"{predicted_total_change / 1000:+,.2f}K"
             )
-
         else:
-
             st.metric(
                 "預測資金變化",
-                "資料不足"
+                "-"
             )
 
     # ==========================================
@@ -1510,31 +1501,41 @@ def analyze_tce_investment(
 
     # 只顯示前 N 匹
     display_df = horse_summary.head(top_n).copy()
-
+    
     # 獨贏賠率格式
     def format_win_odds(value):
-
         if pd.isna(value):
             return "-"
-
+    
         try:
-
             value = float(value)
-
+    
             if np.isinf(value):
                 return "SCR"
-
+    
             return f"{value:.1f}"
-
+    
         except (TypeError, ValueError):
-
             return "-"
-
+    
+    
     display_df["獨贏賠率"] = (
         display_df["獨贏賠率"]
         .map(format_win_odds)
     )
-
+    
+    # 金額欄位只在顯示時轉換成 K
+    money_columns = [
+        "三分鐘前總投注額",
+        "最新總投注額",
+        "三分鐘資金變化",
+        "預測資金變化",
+        "預測後總投注額"
+    ]
+    
+    for col in money_columns:
+        display_df[col] = display_df[col] / 1000
+    
     # 不顯示排名 Column
     display_df = display_df[
         [
@@ -1548,19 +1549,16 @@ def analyze_tce_investment(
             "預測後總投注額"
         ]
     ]
-
-    # 格式化數字
-    styled_df = display_df.style.format(
-        {
-            "三分鐘前總投注額": "{:,.0f}",
-            "最新總投注額": "{:,.0f}",
-            "三分鐘資金變化": "{:+,.0f}",
-            "預測資金變化": "{:+,.0f}",
-            "預測後總投注額": "{:,.0f}"
-        },
-        na_rep="-"
-    )
-
+    
+    # 顯示 K 單位
+    styled_df = display_df.style.format({
+        "三分鐘前總投注額": "{:,.2f}K",
+        "最新總投注額": "{:,.2f}K",
+        "三分鐘資金變化": "{:+,.2f}K",
+        "預測資金變化": "{:+,.2f}K",
+        "預測後總投注額": "{:,.2f}K"
+    }, na_rep="-")
+    
     st.dataframe(
         styled_df,
         use_container_width=True,
