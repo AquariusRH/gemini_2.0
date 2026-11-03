@@ -741,6 +741,85 @@ def change_overall(time_now):
     st.session_state.diff_dict['overall'] = pd.concat(
         [st.session_state.diff_dict['overall'], total_investment_df]
     )
+
+def get_tce_invest_data(date: str, venue_code: str, race_no: int) -> pd.DataFrame:
+    """
+    取得三重彩 (TCE) 各馬第一名 / 第二名 / 第三名投注額
+    回傳 DataFrame 欄位：馬號, 第一名, 第二名, 第三名
+    """
+    url = "https://info.cld.hkjc.com/graphql/base/"
+    
+    payload = {
+        "operationName": "sp4e_racing_pmPool",
+        "variables": {
+            "date": date,
+            "venueCode": venue_code,
+            "raceNo": race_no,
+            "oddsTypes": ["TCEInvest"]
+        },
+        "query": """
+        query sp4e_racing_pmPool($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+          raceMeetings(date: $date, venueCode: $venueCode) {
+            pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
+              oddsType
+              lastUpdateTime
+              oddsNodes {
+                combString
+                bankerOdds {
+                  combString
+                  oddsValue
+                }
+              }
+            }
+          }
+        }
+        """
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Origin": "https://bet.hkjc.com",
+        "Referer": "https://bet.hkjc.com/"
+    }
+    
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        meetings = data.get("data", {}).get("raceMeetings", [])
+        if not meetings:
+            return pd.DataFrame()
+        
+        pools = meetings[0].get("pmPools", [])
+        tce_pool = next((p for p in pools if p.get("oddsType") == "TCEInvest"), None)
+        
+        if not tce_pool or not tce_pool.get("oddsNodes"):
+            return pd.DataFrame()
+        
+        rows = []
+        for node in tce_pool["oddsNodes"]:
+            horse = node.get("combString")
+            inv = {b["combString"]: int(b["oddsValue"] or 0) for b in node.get("bankerOdds", [])}
+            
+            rows.append({
+                "馬號": horse,
+                "第一名": inv.get("1", 0),
+                "第二名": inv.get("2", 0),
+                "第三名": inv.get("3", 0),
+            })
+        
+        df = pd.DataFrame(rows)
+        
+        # 排序（數字優先，避免 10 排在 2 前面）
+        df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
+        df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
+        
+        return df
+    
+    except Exception as e:
+        st.warning(f"取得 TCEInvest 資料失敗: {e}")
+        return pd.DataFrame()
 # ==================== 3. 繪圖函數 (簡化版) ====================
 def print_bar_chart(time_now):
   post_time = st.session_state.post_time_dict[race_no]
@@ -3280,7 +3359,22 @@ if monitoring_on:
                     st.write(tables["main_table"].to_html(), unsafe_allow_html=True)
                 if tables.get("notice_table"):
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
-           
+
+                        # 取得三重彩投注額
+            tce_df = get_tce_invest_data(date, place, race_no)
+            
+            if not tce_df.empty:
+                st.subheader("三重彩投注額 (TCEInvest)")
+                st.dataframe(
+                    tce_df.style.format({
+                        "第一名": "{:,.0f}",
+                        "第二名": "{:,.0f}",
+                        "第三名": "{:,.0f}"
+                    }),
+                    use_container_width=True
+                )
+            else:
+                st.info("目前沒有三重彩投注額資料")
             time.sleep(time_delay)
         
 
