@@ -3272,6 +3272,8 @@ if monitoring_on:
                     except Exception as e:
                         # 加上 try-except 避免 DB 異常導致 10 秒監控循環崩潰
                         print(f"[Supabase 傳送失敗]: {e}")
+
+            st.write(st.session_state.odds_dict['TRI'])
             time.sleep(time_delay)
         
 
