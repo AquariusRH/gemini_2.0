@@ -807,6 +807,14 @@ def request_tce_investment(date: str, venue_code: str, race_no: int) -> pd.DataF
             })
         
         df = pd.DataFrame(rows)
+        # 呼叫現有 function 取得馬號及馬名
+        horse_info_df = fetch_horse_age_only(date, venue_code, race_no)
+
+        if horse_info_df is not None and not horse_info_df.empty:
+            horse_name_map = horse_info_df["馬名"].to_dict()
+
+            df["馬名"] = df["馬號"].astype(str).map(horse_name_map).fillna("")
+        
         df["馬號_num"] = pd.to_numeric(df["馬號"], errors="coerce")
         df = df.sort_values("馬號_num").drop(columns=["馬號_num"]).reset_index(drop=True)
         df = df.set_index("馬號")
