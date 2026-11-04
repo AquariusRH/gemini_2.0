@@ -2776,7 +2776,7 @@ with st.sidebar:
     # 監控開關
     monitoring_on = st.toggle("啟動即時監控", value=False)
     keep_keys = ["show_bubble", "show_bar", "show_move_bar", "show_top", "show_henery","bar_key", 
-                 "bubble_key","save_db","show_qin_overall_heat_table","show_money_table","show_moneyflow_alerts","show_prediction_table","show_tri"]
+                 "bubble_key","save_db","show_qin_overall_heat_table","show_money_table","show_moneyflow_alerts","show_prediction_table","show_tri","show_tce"]
     if st.button("重置所有數據"):
         for key in list(st.session_state.keys()):
             if key not in keep_keys:
@@ -2794,6 +2794,7 @@ with st.sidebar:
     save_db = st.toggle("📜儲存database", key="save_db", value=False)
     show_qin_overall_heat_table = st.toggle("🎯儲存連贏圖", key="show_qin_overall_heat_table", value=False)
     show_tri = st.toggle("🎯 顯示單T (TRI) 排名", key="show_tri", value=False)
+    show_tce = st.toggle("🎯 顯示三重彩 (TCE) 排名", key="show_tce", value=True)
 # --- 賽事資料加載 ---
 @st.cache_data(ttl=3600)
 def fetch_race_card(date_str, venue):
@@ -3951,15 +3952,16 @@ if monitoring_on:
                     #st.plotly_chart(fig4, width='stretch', key=f"top4_{time_now.strftime('&H%M%S')}")
             if show_money_table:
                 print_money_table(race_no)
+                
+            if show_tce:
+                request_tce_investment(Date,place,race_no,time_now)
+                tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
+                tce_result = analyze_tce_investment(tce_df, race_no)
+                
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
                 
-            # 使用與 odds_dict 相同的更新時間
-            request_tce_investment(Date,place,race_no,time_now)
-            tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
-            tce_result = analyze_tce_investment(tce_df, race_no)
-            
             if show_qin_overall_heat_table:
                 render_qin_overall_heat_table(
                     qin_df=st.session_state.overall_investment_dict.get('QIN'),
