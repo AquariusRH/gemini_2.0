@@ -1336,7 +1336,7 @@ def analyze_tce_investment(tce_df, race_no):
     st.caption(
         "賠率順序：當時 - 一分鐘前 - 三分鐘前。"
         "第一個箭咀比較當時與一分鐘前；"
-        "第二個箭咀比較一分鐘前與三分鐘前。"
+        "第二個箭咀比較一分鐘前與三分鐘前。  \n"
         "↓ 代表賠率下跌，↑ 代表賠率上升，→ 代表不變。"
     )
     st.caption("按一分鐘資金變化由高至低排序；正數代表投注增加。")
@@ -3670,7 +3670,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
     st.caption(
         "賠率順序：當時 - 一分鐘前 - 三分鐘前。"
         "第一個箭咀比較當時與一分鐘前；"
-        "第二個箭咀比較一分鐘前與三分鐘前。"
+        "第二個箭咀比較一分鐘前與三分鐘前。  \n"
         "↓ 賠率下跌，↑ 賠率上升，→ 賠率不變。"
     )
 
@@ -3954,6 +3954,11 @@ if monitoring_on:
             if show_top:
                 st.markdown("### 連贏賠率排名")
                 print_top()
+                
+            # 使用與 odds_dict 相同的更新時間
+            request_tce_investment(Date,place,race_no,time_now)
+            tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
+            tce_result = analyze_tce_investment(tce_df, race_no)
             
             if show_qin_overall_heat_table:
                 render_qin_overall_heat_table(
@@ -4009,10 +4014,7 @@ if monitoring_on:
                 if tables.get("notice_table"):
                     st.write(tables["notice_table"].to_html(), unsafe_allow_html=True)
         
-            # 使用與 odds_dict 相同的更新時間
-            request_tce_investment(Date,place,race_no,time_now)
-            tce_df = st.session_state.get("tce_investment_df", pd.DataFrame())
-            tce_result = analyze_tce_investment(tce_df, race_no)
+            
             time.sleep(time_delay)
         
 
