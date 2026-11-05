@@ -2615,9 +2615,11 @@ def print_henery_model(gamma=1.18):
                 ygap=2,
                 xgap=1,
                 colorbar=dict(
-                    title="過熱組合數量",
-                    tickfont=dict(color="white"),
-                    titlefont=dict(color="white")
+                    title=dict(
+                        text="過熱組合數量",
+                        font=dict(color="white")
+                    ),
+                    tickfont=dict(color="white")
                 ),
                 hovertemplate=(
                     "馬匹：%{y}<br>"
