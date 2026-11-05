@@ -946,6 +946,7 @@ def request_tce_investment(
 
 
 
+
 # ============================================================
 # 1. 標準化馬號及時間
 # ============================================================
@@ -1006,7 +1007,7 @@ def get_tce_horse_metadata(race_no):
 
 
 # ============================================================
-# 3. 取得 WIN 賠率歷史
+# 3. 取得當刻至 4 分鐘前的 WIN 賠率
 # ============================================================
 
 def get_tce_win_odds_history(reference_time):
@@ -1014,7 +1015,7 @@ def get_tce_win_odds_history(reference_time):
     odds_df = odds_dict.get("WIN", pd.DataFrame())
 
     if odds_df is None or odds_df.empty:
-        return {}, {}, {}
+        return {}
 
     odds_history = odds_df.copy()
     odds_history.index = normalize_tce_datetime_index(odds_history.index)
@@ -1023,47 +1024,35 @@ def get_tce_win_odds_history(reference_time):
     odds_history = odds_history[~odds_history.index.duplicated(keep="last")]
 
     if odds_history.empty:
-        return {}, {}, {}
+        return {}
 
     reference_time = normalize_tce_timestamp(reference_time)
-    one_min_ago = reference_time - pd.Timedelta(minutes=1)
-    three_min_ago = reference_time - pd.Timedelta(minutes=3)
+    odds_maps = {}
 
-    # 取得指定時間之前最近一次賠率
-    def get_odds_row(target_time):
+    # 分別取得當刻、1、2、3、4 分鐘前的賠率
+    for minute in range(5):
+        target_time = reference_time - pd.Timedelta(minutes=minute)
         available = odds_history[odds_history.index <= target_time]
-        if available.empty:
-            return None
-        return available.iloc[-1]
-
-    # 將賠率 Series 轉換成馬號字典
-    def series_to_map(row):
         odds_map = {}
-        if row is None:
-            return odds_map
-        for horse_no, odds in row.items():
-            horse_no = normalize_tce_horse_no(horse_no)
-            if not horse_no:
-                continue
-            try:
-                odds_map[horse_no] = float(odds)
-            except (TypeError, ValueError):
-                odds_map[horse_no] = np.nan
-        return odds_map
 
-    current_row = get_odds_row(reference_time)
-    one_min_row = get_odds_row(one_min_ago)
-    three_min_row = get_odds_row(three_min_ago)
+        if not available.empty:
+            latest_row = available.iloc[-1]
+            for horse_no, odds in latest_row.items():
+                horse_no = normalize_tce_horse_no(horse_no)
+                if not horse_no:
+                    continue
+                try:
+                    odds_map[horse_no] = float(odds)
+                except (TypeError, ValueError):
+                    odds_map[horse_no] = np.nan
 
-    current_odds_map = series_to_map(current_row)
-    one_min_odds_map = series_to_map(one_min_row)
-    three_min_odds_map = series_to_map(three_min_row)
+        odds_maps[minute] = odds_map
 
-    return current_odds_map, one_min_odds_map, three_min_odds_map
+    return odds_maps
 
 
 # ============================================================
-# 4. 格式化金額及賠率
+# 4. 格式化投注額及賠率
 # ============================================================
 
 def format_tce_amount(amount):
@@ -1087,59 +1076,45 @@ def format_tce_odds(odds):
 
 
 # ============================================================
-# 5. 賠率箭咀比較
+# 5. 賠率箭咀比較及五階賠率顯示
 # ============================================================
 
-def get_odds_arrow(current, previous):
-    """
-    比較較新的賠率與較舊的賠率。
-    新賠率低於舊賠率：↓
-    新賠率高於舊賠率：↑
-    相同：→
-    """
+def get_odds_arrow(newer, older):
     try:
-        current = float(current)
-        previous = float(previous)
+        newer = float(newer)
+        older = float(older)
+        if not np.isfinite(newer) or not np.isfinite(older):
+            return "-"
+        if newer < older:
+            return "↓"
+        elif newer > older:
+            return "↑"
+        else:
+            return "→"
     except (TypeError, ValueError):
         return "-"
 
-    if not np.isfinite(current) or not np.isfinite(previous):
+
+def format_tce_odds_history(row):
+    odds_values = [
+        row.get("當刻獨贏賠率", np.nan),
+        row.get("1分鐘前獨贏賠率", np.nan),
+        row.get("2分鐘前獨贏賠率", np.nan),
+        row.get("3分鐘前獨贏賠率", np.nan),
+        row.get("4分鐘前獨贏賠率", np.nan)
+    ]
+
+    if all(pd.isna(x) for x in odds_values):
         return "-"
 
-    if current < previous:
-        return "↓"
-    elif current > previous:
-        return "↑"
-    else:
-        return "→"
+    parts = [format_tce_odds(odds_values[0])]
 
+    for i in range(1, 5):
+        odds_str = format_tce_odds(odds_values[i])
+        arrow = get_odds_arrow(odds_values[i - 1], odds_values[i])
+        parts.append(f"{odds_str} {arrow}")
 
-def format_tce_odds_change(row):
-    """
-    顯示順序：
-    當時賠率 - 一分鐘前賠率 箭咀 - 三分鐘前賠率 箭咀
-
-    第一個箭咀：當時賠率與一分鐘前賠率比較。
-    第二個箭咀：一分鐘前賠率與三分鐘前賠率比較。
-    """
-    current = row["獨贏賠率"]
-    one_min = row["一分鐘前獨贏賠率"]
-    three_min = row["三分鐘前獨贏賠率"]
-
-    if pd.isna(current) and pd.isna(one_min) and pd.isna(three_min):
-        return "-"
-
-    current_str = format_tce_odds(current)
-    one_min_str = format_tce_odds(one_min)
-    three_min_str = format_tce_odds(three_min)
-
-    arrow_1m = get_odds_arrow(current, one_min)
-    arrow_3m = get_odds_arrow(one_min, three_min)
-
-    return (
-        f"{current_str} - {one_min_str} {arrow_1m} "
-        f"- {three_min_str} {arrow_3m}"
-    )
+    return " - ".join(parts)
 
 
 # ============================================================
@@ -1175,6 +1150,7 @@ def analyze_tce_investment(tce_df, race_no):
                 post_time = post_time.tz_localize(HK_TZ)
             else:
                 post_time = post_time.tz_convert(HK_TZ)
+
             seconds_left = (post_time - pd.Timestamp(now)).total_seconds()
             time_str = (
                 "🏁 已開跑"
@@ -1226,15 +1202,14 @@ def analyze_tce_investment(tce_df, race_no):
     one_min_ago = latest_time - pd.Timedelta(minutes=1)
     three_min_ago = latest_time - pd.Timedelta(minutes=3)
 
-    # --- 取得馬名及三個時間點的 WIN 賠率 ---
+    # --- 取得馬名及五個時間點的 WIN 賠率 ---
     horse_name_map = get_tce_horse_metadata(race_no)
-    current_odds_map, one_min_odds_map, three_min_odds_map = (
-        get_tce_win_odds_history(latest_time)
-    )
+    odds_maps = get_tce_win_odds_history(latest_time)
 
     # --- 整理 TCE 欄位 ---
     # MultiIndex Level 0 = 馬號，Level 1 = 名次
     horse_columns = {}
+
     for col in df.columns:
         if not isinstance(col, tuple) or len(col) < 1:
             continue
@@ -1247,8 +1222,9 @@ def analyze_tce_investment(tce_df, race_no):
         st.warning("找不到有效的 TCE 馬匹資料。")
         return None
 
-    # --- 逐匹馬分析投注額 ---
+    # --- 逐匹馬分析投注額及賠率 ---
     results = []
+
     for horse_no, columns in horse_columns.items():
         horse_df = df[columns].copy()
         horse_df = horse_df.apply(pd.to_numeric, errors="coerce")
@@ -1261,7 +1237,7 @@ def analyze_tce_investment(tce_df, race_no):
         if pd.isna(latest_amount):
             continue
 
-        # 一分鐘及三分鐘前最近一次投注額
+        # 一分鐘及三分鐘前投注額
         one_min_amount = get_tce_amount_at_or_before(horse_history, one_min_ago)
         three_min_amount = get_tce_amount_at_or_before(horse_history, three_min_ago)
 
@@ -1275,17 +1251,21 @@ def analyze_tce_investment(tce_df, race_no):
             if pd.notna(three_min_amount) else np.nan
         )
 
-        # 取得三個時間點的賠率
-        current_odds = current_odds_map.get(horse_no, np.nan)
-        one_min_odds = one_min_odds_map.get(horse_no, np.nan)
-        three_min_odds = three_min_odds_map.get(horse_no, np.nan)
+        # 取得當刻至 4 分鐘前的獨贏賠率
+        current_odds = odds_maps.get(0, {}).get(horse_no, np.nan)
+        one_min_odds = odds_maps.get(1, {}).get(horse_no, np.nan)
+        two_min_odds = odds_maps.get(2, {}).get(horse_no, np.nan)
+        three_min_odds = odds_maps.get(3, {}).get(horse_no, np.nan)
+        four_min_odds = odds_maps.get(4, {}).get(horse_no, np.nan)
 
         results.append({
             "馬號": horse_no,
             "馬名": horse_name_map.get(horse_no, ""),
-            "獨贏賠率": current_odds,
-            "一分鐘前獨贏賠率": one_min_odds,
-            "三分鐘前獨贏賠率": three_min_odds,
+            "當刻獨贏賠率": current_odds,
+            "1分鐘前獨贏賠率": one_min_odds,
+            "2分鐘前獨贏賠率": two_min_odds,
+            "3分鐘前獨贏賠率": three_min_odds,
+            "4分鐘前獨贏賠率": four_min_odds,
             "三分鐘前總投注額": three_min_amount,
             "三分鐘資金變化": three_min_change,
             "一分鐘前總投注額": one_min_amount,
@@ -1300,10 +1280,10 @@ def analyze_tce_investment(tce_df, race_no):
     # --- 建立分析 DataFrame ---
     summary_df = pd.DataFrame(results)
 
-    # --- 排序：一分鐘資金變化由高至低，最新賠率由低至高 ---
+    # --- 排序：一分鐘資金變化由高至低，當刻賠率由低至高 ---
     # 不限制馬匹數量
     summary_df = summary_df.sort_values(
-        by=["一分鐘資金變化", "獨贏賠率"],
+        by=["一分鐘資金變化", "當刻獨贏賠率"],
         ascending=[False, True],
         na_position="last",
         kind="mergesort"
@@ -1327,19 +1307,17 @@ def analyze_tce_investment(tce_df, race_no):
     display_df = pd.DataFrame({
         "馬號": summary_df["馬號"],
         "馬名": summary_df["馬名"],
-        "賠率變化": summary_df.apply(format_tce_odds_change, axis=1),
+        "獨贏賠率": summary_df.apply(format_tce_odds_history, axis=1),
         "三分鐘前": summary_df["三分鐘資金變化"].apply(format_tce_difference),
         "一分鐘前": summary_df["一分鐘資金變化"].apply(format_tce_difference),
         "最新總投注": summary_df["最新總投注額"].apply(format_tce_amount)
     })
 
-    st.caption(
-        "賠率順序：當時 - 一分鐘前 - 三分鐘前。"
-        "第一個箭咀比較當時與一分鐘前；"
-        "第二個箭咀比較一分鐘前與三分鐘前。  \n"
-        "↓ 代表賠率下跌，↑ 代表賠率上升，→ 代表不變。"
-    )
-    st.caption("按一分鐘資金變化由高至低排序；正數代表投注增加。")
+    #st.caption(
+    #    "獨贏賠率順序：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。  \n"
+    #    "每個箭咀均與前一個時間點比較：↓ 下跌，↑ 上升，→ 不變。"
+    #)
+    #st.caption("按一分鐘資金變化由高至低排序；正數代表投注增加，負數代表投注減少。")
     st.table(display_df)
 
     return {
@@ -1350,6 +1328,7 @@ def analyze_tce_investment(tce_df, race_no):
         "three_min_total_change": three_min_total_change,
         "latest_time": latest_time
     }
+
 
 # ==================== 3. 繪圖函數 (簡化版) ====================
 def print_bar_chart(time_now):
