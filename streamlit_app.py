@@ -2077,7 +2077,7 @@ def print_henery_model(gamma=1.18):
 
     for h in win_probs:
         win_probs[h] /= inv_sum
-
+    all_horse_list = sorted(win_probs.keys())
     # =========================================================
     # 4. 處理 QIN 連贏賠率
     # =========================================================
@@ -2292,7 +2292,7 @@ def print_henery_model(gamma=1.18):
         st.markdown("---")
         st.subheader("🔥 個別馬匹過熱組合")
         st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
-        all_horse_list = sorted(win_probs.keys())
+        
         num_horses = len(all_horse_list)
     
         if num_horses > 0:
