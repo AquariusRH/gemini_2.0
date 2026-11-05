@@ -2285,291 +2285,266 @@ def print_henery_model(gamma=1.18):
 
     else:
         st.info("目前無過熱組合")
-
-    # =========================================================
-    # 9. 個別馬匹過熱組合
-    # =========================================================
-    st.markdown("---")
-    st.subheader("🔥 個別馬匹過熱組合")
-
-    all_horse_list = sorted(win_probs.keys())
-    num_horses = len(all_horse_list)
-
-    if num_horses > 0:
-
-        fig = go.Figure()
-        horse_sub_dfs = []
-
-        # 每匹馬只建立一個 Table Trace
-        for h_num in all_horse_list:
-
-            mask = ov_df['組合'].apply(
-                lambda x: h_num in [
-                    int(n) for n in re.findall(r'\d+', str(x))
-                ]
-            )
-
-            sub_df = (
-                ov_df[mask]
-                .sort_values('Value', ascending=True)
-                .reset_index(drop=True)
-            )
-
-            horse_sub_dfs.append(sub_df)
-
-            if not sub_df.empty:
-
-                val_bg_colors, val_font_colors = get_adaptive_colors(
-                    sub_df["Value"]
+ 
+        # =========================================================
+        # 9. 個別馬匹過熱組合
+        # =========================================================
+        st.markdown("---")
+        st.subheader("🔥 個別馬匹過熱組合")
+        st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
+        all_horse_list = sorted(win_probs.keys())
+        num_horses = len(all_horse_list)
+    
+        if num_horses > 0:
+            fig = go.Figure()
+            horse_sub_dfs = []
+    
+            # 每匹馬建立一個 Table
+            for i, h_num in enumerate(all_horse_list):
+                mask = ov_df['組合'].apply(
+                    lambda x: h_num in [
+                        int(n) for n in re.findall(r'\d+', str(x))
+                    ]
                 )
-
-                init_font_colors = get_rank_font_colors(
-                    sub_df["最初排名"]
+                sub_df = (
+                    ov_df[mask]
+                    .sort_values('Value', ascending=True)
+                    .reset_index(drop=True)
                 )
-
-                prev_font_colors = get_rank_font_colors(
-                    sub_df["上一次排名"]
-                )
-
-                fig.add_trace(
-                    go.Table(
-                        columnwidth=[100, 65, 85, 85, 80, 80, 75],
-
-                        header=dict(
-                            values=[
-                                "<b>組合</b>",
-                                "<b>排名</b>",
-                                "<b>最初</b>",
-                                "<b>上一次</b>",
-                                "<b>實時Q</b>",
-                                "<b>理論Q</b>",
-                                "<b>Value</b>"
-                            ],
-                            fill_color='#111111',
-                            align='center',
-                            font=dict(
-                                color='white',
-                                size=19
-                            ),
-                            line_color='#333333',
-                            height=48
-                        ),
-
-                        cells=dict(
-                            values=[
-                                sub_df["組合"],
-                                sub_df["排名"],
-                                sub_df["最初排名"],
-                                sub_df["上一次排名"],
-                                sub_df["實時Q"],
-                                sub_df["理論Q"],
-                                sub_df["Value"]
-                            ],
-
-                            fill_color=[
-                                ['rgba(30,30,30,0.5)'] * len(sub_df),
-                                ['rgba(30,30,30,0.5)'] * len(sub_df),
-                                ['rgba(30,30,30,0.5)'] * len(sub_df),
-                                ['rgba(30,30,30,0.5)'] * len(sub_df),
-                                ['rgba(30,30,30,0.5)'] * len(sub_df),
-                                ['rgba(30,30,30,0.5)'] * len(sub_df),
-                                val_bg_colors
-                            ],
-
-                            font=dict(
-                                color=[
-                                    ['white'] * len(sub_df),
-                                    ['white'] * len(sub_df),
-                                    init_font_colors,
-                                    prev_font_colors,
-                                    ['white'] * len(sub_df),
-                                    ['white'] * len(sub_df),
-                                    val_font_colors
+                horse_sub_dfs.append(sub_df)
+    
+                if not sub_df.empty:
+                    val_bg_colors, val_font_colors = get_adaptive_colors(
+                        sub_df["Value"]
+                    )
+                    init_font_colors = get_rank_font_colors(
+                        sub_df["最初排名"]
+                    )
+                    prev_font_colors = get_rank_font_colors(
+                        sub_df["上一次排名"]
+                    )
+    
+                    fig.add_trace(
+                        go.Table(
+                            columnwidth=[100, 65, 85, 85, 80, 80, 75],
+                            header=dict(
+                                values=[
+                                    "<b>組合</b>", "<b>排名</b>",
+                                    "<b>最初</b>", "<b>上一次</b>",
+                                    "<b>實時Q</b>", "<b>理論Q</b>",
+                                    "<b>Value</b>"
                                 ],
-                                size=18
+                                fill_color='#111111',
+                                align='center',
+                                font=dict(color='white', size=19),
+                                line_color='#333333',
+                                height=48
                             ),
-
-                            align='center',
-                            line_color='#333333',
-                            height=45
-                        ),
-
-                        visible=(len(fig.data) == 0),
-                        domain=dict(x=[0, 1])
-                    )
-                )
-
-            else:
-
-                fig.add_trace(
-                    go.Table(
-                        header=dict(
-                            values=["<b>狀態提示</b>"],
-                            fill_color='#111111',
-                            font=dict(color='white', size=19),
-                            height=48
-                        ),
-                        cells=dict(
-                            values=[
-                                [f"馬匹 {h_num} 號目前沒有過熱組合"]
-                            ],
-                            fill_color=['rgba(30,30,30,0.5)'],
-                            font=dict(
-                                color='#aaaaaa',
-                                size=20
+                            cells=dict(
+                                values=[
+                                    sub_df["組合"],
+                                    sub_df["排名"],
+                                    sub_df["最初排名"],
+                                    sub_df["上一次排名"],
+                                    sub_df["實時Q"],
+                                    sub_df["理論Q"],
+                                    sub_df["Value"]
+                                ],
+                                fill_color=[
+                                    ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                    ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                    ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                    ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                    ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                    ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                    val_bg_colors
+                                ],
+                                font=dict(
+                                    color=[
+                                        ['white'] * len(sub_df),
+                                        ['white'] * len(sub_df),
+                                        init_font_colors,
+                                        prev_font_colors,
+                                        ['white'] * len(sub_df),
+                                        ['white'] * len(sub_df),
+                                        val_font_colors
+                                    ],
+                                    size=18
+                                ),
+                                align='center',
+                                line_color='#333333',
+                                height=45
                             ),
-                            height=60
-                        ),
-                        visible=(len(fig.data) == 0),
-                        domain=dict(x=[0, 1])
+                            visible=(i == 0),
+                            domain=dict(x=[0, 1])
+                        )
                     )
-                )
-
-        # -----------------------------------------------------
-        # 按鈕設定
-        # -----------------------------------------------------
-        buttons_per_row = 7
-
-        menu_rows = (
-            num_horses + buttons_per_row - 1
-        ) // buttons_per_row
-
-        menu_list = []
-
-        # 預留空間只按按鈕行數，不按最多組合數量
-        top_margin = 45 + menu_rows * 45
-
-        def get_dynamic_height(row_count):
-            """
-            按目前選中的馬匹實際組合數量調整圖表高度。
-            不使用所有馬匹中最多組合數量作固定高度。
-            """
-            table_header_height = 48
-            table_row_height = 45
-            bottom_margin = 25
-
-            return (
-                top_margin
-                + table_header_height
-                + max(1, row_count) * table_row_height
-                + bottom_margin
-            )
-
-        for row_idx in range(0, num_horses, buttons_per_row):
-
-            row_horses = all_horse_list[
-                row_idx:row_idx + buttons_per_row
-            ]
-
-            row_buttons = []
-
-            for h_btn in row_horses:
-
-                g_idx = all_horse_list.index(h_btn)
-                sub_df = horse_sub_dfs[g_idx]
-
-                count = len(sub_df)
-
-                plus_count = 0
-
-                if (
-                    not sub_df.empty
-                    and '上一次排名' in sub_df.columns
-                ):
-                    plus_count = (
-                        sub_df['上一次排名']
-                        .astype(str)
-                        .str.contains(r'\+')
-                        .sum()
+                else:
+                    fig.add_trace(
+                        go.Table(
+                            header=dict(
+                                values=["<b>狀態提示</b>"],
+                                fill_color='#111111',
+                                font=dict(color='white', size=19),
+                                height=48
+                            ),
+                            cells=dict(
+                                values=[
+                                    [f"馬匹 {h_num} 號目前沒有過熱組合"]
+                                ],
+                                fill_color=['rgba(30,30,30,0.5)'],
+                                font=dict(color='#aaaaaa', size=20),
+                                height=60
+                            ),
+                            visible=(i == 0),
+                            domain=dict(x=[0, 1])
+                        )
                     )
-
-                # 只有所選馬匹的 Trace 顯示
-                vis = [
-                    j == g_idx
-                    for j in range(num_horses)
+    
+            # -----------------------------------------------------
+            # 按鈕及高度設定
+            # -----------------------------------------------------
+            buttons_per_row = 7
+            menu_rows = (num_horses + buttons_per_row - 1) // buttons_per_row
+    
+            # 只為按鈕行數預留空間，不按最多過熱組合數量預留
+            top_margin = 45 + menu_rows * 45
+            bottom_margin = 10
+            button_gap_px = 44
+    
+            def get_table_height(count):
+                if count <= 0:
+                    return 48 + 60 + 10
+                return 48 + count * 45 + 10
+    
+            def get_chart_height(count):
+                return top_margin + get_table_height(count) + bottom_margin
+    
+            # 每次按鈕切換時，根據新的表格高度重新計算按鈕間距
+            def get_menu_y_positions(count):
+                table_height = get_table_height(count)
+                gap = button_gap_px / table_height
+    
+                return [
+                    1.01 + (menu_rows - 1 - row_idx) * gap
+                    for row_idx in range(menu_rows)
                 ]
-
-                # 按每匹馬實際行數計算高度
-                dynamic_height = get_dynamic_height(count)
-
-                row_buttons.append({
-                    "label": f"{h_btn:02d}號 ({count}) (+{plus_count})",
-                    "method": "update",
-                    "args": [
-                        {"visible": vis},
-                        {
-                            "height": dynamic_height,
-                            "title": {
-                                "text": f"<b>正在檢視：{h_btn} 號馬過熱組合</b>",
-                                "font": {
-                                    "size": 19,
-                                    "color": "white"
-                                }
+    
+            menu_list = []
+    
+            for row_idx in range(menu_rows):
+                row_horses = all_horse_list[
+                    row_idx * buttons_per_row:
+                    (row_idx + 1) * buttons_per_row
+                ]
+    
+                row_buttons = []
+    
+                for h_btn in row_horses:
+                    g_idx = all_horse_list.index(h_btn)
+                    sub_df = horse_sub_dfs[g_idx]
+                    count = len(sub_df)
+    
+                    plus_count = 0
+                    if not sub_df.empty:
+                        plus_count = (
+                            sub_df['上一次排名']
+                            .astype(str)
+                            .str.contains(r'\+')
+                            .sum()
+                        )
+    
+                    vis = [
+                        j == g_idx
+                        for j in range(num_horses)
+                    ]
+    
+                    # 更新高度及按鈕位置
+                    layout_update = {
+                        "height": get_chart_height(count),
+                        "title": {
+                            "text": f"<b>正在檢視：{h_btn} 號馬過熱組合</b>",
+                            "font": {
+                                "size": 19,
+                                "color": "white"
                             }
                         }
-                    ]
+                    }
+    
+                    new_y_positions = get_menu_y_positions(count)
+    
+                    for menu_idx, menu_y in enumerate(new_y_positions):
+                        layout_update[
+                            f"updatemenus[{menu_idx}].y"
+                        ] = menu_y
+    
+                    row_buttons.append({
+                        "label": f"{h_btn:02d}號 ({count}) (+{plus_count})",
+                        "method": "update",
+                        "args": [
+                            {"visible": vis},
+                            layout_update
+                        ]
+                    })
+    
+                menu_list.append({
+                    "type": "buttons",
+                    "direction": "right",
+                    "x": 0,
+                    "xanchor": "left",
+                    "yanchor": "bottom",
+                    "y": 1.01,
+                    "buttons": row_buttons,
+                    "showactive": False,
+                    "bgcolor": "#333333",
+                    "font": {
+                        "color": "white",
+                        "size": 19
+                    },
+                    "bordercolor": "#777777",
+                    "borderwidth": 1,
+                    "pad": {
+                        "r": 10,
+                        "t": 5,
+                        "b": 5
+                    }
                 })
-
-            current_row_from_bottom = (
-                menu_rows - 1 - (row_idx // buttons_per_row)
+    
+            # 初始馬匹的按鈕位置及高度
+            initial_count = len(horse_sub_dfs[0])
+            initial_y_positions = get_menu_y_positions(initial_count)
+    
+            for menu_idx, menu_y in enumerate(initial_y_positions):
+                menu_list[menu_idx]["y"] = menu_y
+    
+            fig.update_layout(
+                dragmode=False,
+                updatemenus=menu_list,
+                margin=dict(
+                    t=top_margin,
+                    b=bottom_margin,
+                    l=0,
+                    r=0
+                ),
+                height=get_chart_height(initial_count),
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(
+                    color="white",
+                    family="Arial",
+                    size=18
+                )
             )
-
-            menu_list.append({
-                "type": "buttons",
-                "direction": "right",
-                "x": 0,
-                "xanchor": "left",
-                "yanchor": "bottom",
-                "y": 1.01 + (current_row_from_bottom * 0.09),
-                "buttons": row_buttons,
-                "showactive": False,
-                "bgcolor": "#333333",
-                "font": {
-                    "color": "white",
-                    "size": 19
-                },
-                "bordercolor": "#777777",
-                "borderwidth": 1,
-                "pad": {
-                    "r": 10,
-                    "t": 5,
-                    "b": 5
-                }
-            })
-
-        # -----------------------------------------------------
-        # 初始高度：只按第一匹馬的組合數量計算
-        # -----------------------------------------------------
-        initial_count = len(horse_sub_dfs[0])
-
-        fig.update_layout(
-            dragmode=False,
-            updatemenus=menu_list,
-            margin=dict(
-                t=top_margin,
-                b=10,
-                l=0,
-                r=0
-            ),
-            height=get_dynamic_height(initial_count),
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(
-                color="white",
-                family="Arial",
-                size=18
+    
+            latest_stamp = pd.to_datetime(
+                win_df.index[-1]
+            ).strftime('%H%M%S')
+    
+            st.plotly_chart(
+                fig,
+                width='stretch',
+                key=f"henery_horse_{race_no}_{latest_stamp}",
+                config={'displayModeBar': False}
             )
-        )
-
-        latest_stamp = (
-            pd.to_datetime(win_df.index[-1]).strftime('%H%M%S')
-        )
-
-        st.plotly_chart(
-            fig,
-            width='stretch',
-            key=f"henery_horse_{race_no}_{latest_stamp}",
-            config={'displayModeBar': False}
-        )
 
     # =========================================================
     # 10. 歷史過熱組合 Heatmap
