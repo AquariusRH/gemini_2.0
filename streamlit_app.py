@@ -3407,40 +3407,40 @@ def print_prediction_table(race_no, title="🎯實時資金流綜合預測排名
 def calculate_money_flow_only(race_no):
     """
     只計算並回傳 Money Flow 相關資料，不計算 Static Score。
-    自動過濾當前賠率為 inf 的退出馬匹。
-    一分鐘前賠率：優先取 4 格前，不足則用最開頭資料。
-    三分鐘前賠率：優先取 12 格前，不足則用最開頭資料。
+    自動過濾當刻賠率為 inf 的退出馬匹。
+    賠率歷史：當刻、1、2、3、4 分鐘前。
+    每分鐘按 4 格計算，歷史資料不足時保留 NaN，不使用最早一筆代替。
     """
-    # ----------------------------------------------------
-    # 1. 獲取最新、一分鐘前及三分鐘前賠率
-    # ----------------------------------------------------
     odds_dict = st.session_state.get('odds_dict', {})
     if 'WIN' not in odds_dict or odds_dict['WIN'].empty:
         return pd.DataFrame()
 
-    odds_df = odds_dict['WIN']
-
-    # 最新賠率
+    odds_df = odds_dict['WIN'].copy().sort_index()
     latest_odds = odds_df.iloc[-1].rename('Odds')
 
-    # 一分鐘前賠率：4 格前
-    if len(odds_df) >= 5:
-        one_min_odds = odds_df.iloc[-5]
-    else:
-        one_min_odds = odds_df.iloc[0]
+    # 每分鐘 4 格：0、4、8、12、16 格前
+    odds_columns = {
+        'Odds': 0,
+        'OneMinOdds': 4,
+        'TwoMinOdds': 8,
+        'ThreeMinOdds': 12,
+        'FourMinOdds': 16
+    }
 
-    one_min_odds = one_min_odds.rename('OneMinOdds')
-
-    # 三分鐘前賠率：12 格前
-    if len(odds_df) >= 13:
-        three_min_odds = odds_df.iloc[-13]
-    else:
-        three_min_odds = odds_df.iloc[0]
-
-    three_min_odds = three_min_odds.rename('ThreeMinOdds')
+    odds_series = {}
+    for column, rows_back in odds_columns.items():
+        row_position = len(odds_df) - 1 - rows_back
+        if row_position >= 0:
+            odds_series[column] = odds_df.iloc[row_position].rename(column)
+        else:
+            odds_series[column] = pd.Series(
+                np.nan,
+                index=latest_odds.index,
+                name=column
+            )
 
     # ----------------------------------------------------
-    # 2. 計算 Money Flow（近期 10 筆）
+    # 1. 計算 Money Flow（近期 10 筆）
     # ----------------------------------------------------
     total_money_flow = pd.DataFrame(
         0,
@@ -3449,7 +3449,6 @@ def calculate_money_flow_only(race_no):
     )
 
     diff_dict = st.session_state.get('diff_dict', {})
-
     for method in methodlist:
         if method in diff_dict and not diff_dict[method].empty:
             current_method_sum = diff_dict[method].tail(10).sum()
@@ -3461,19 +3460,21 @@ def calculate_money_flow_only(race_no):
             )
 
     # ----------------------------------------------------
-    # 3. 建立基礎 DataFrame
+    # 2. 建立基礎 DataFrame
     # ----------------------------------------------------
     df = pd.concat(
         [
-            latest_odds,
-            one_min_odds,
-            three_min_odds,
+            odds_series['Odds'],
+            odds_series['OneMinOdds'],
+            odds_series['TwoMinOdds'],
+            odds_series['ThreeMinOdds'],
+            odds_series['FourMinOdds'],
             total_money_flow
         ],
         axis=1
     )
 
-    # 過濾退出馬匹（當前賠率為 inf 或 -inf）
+    # 過濾退出馬匹：只根據當刻賠率判斷
     df = df[~df['Odds'].isin([np.inf, -np.inf])]
     df = df[pd.notna(df['Odds'])]
 
@@ -3481,10 +3482,9 @@ def calculate_money_flow_only(race_no):
         return pd.DataFrame()
 
     # ----------------------------------------------------
-    # 4. 加入基本靜態資訊
+    # 3. 加入基本靜態資訊
     # ----------------------------------------------------
     race_dataframes = st.session_state.get('race_dataframes', {})
-
     static_df = race_dataframes.get(race_no)
 
     if static_df is None:
@@ -3497,12 +3497,9 @@ def calculate_money_flow_only(race_no):
 
     try:
         df.index = df.index.astype(str)
-
         if static_df.index.name != '馬號':
             static_df = static_df.reset_index().set_index('馬號')
-
         static_df.index = static_df.index.astype(str)
-
     except Exception as e:
         st.error(f"索引轉換錯誤: {e}")
         return pd.DataFrame()
@@ -3512,12 +3509,10 @@ def calculate_money_flow_only(race_no):
         col for col in basic_cols
         if col in static_df.columns
     ]
-
-    static_basic = static_df[available_cols]
-    df = df.join(static_basic, how='left')
+    df = df.join(static_df[available_cols], how='left')
 
     # ----------------------------------------------------
-    # 5. 智慧排序
+    # 4. 智慧排序
     # ----------------------------------------------------
     if (df['MoneyFlow'] == 0).all():
         df = df.sort_values('Odds', ascending=True)
@@ -3530,10 +3525,10 @@ def calculate_money_flow_only(race_no):
 def print_money_table(race_no, title="💰 Money Flow 專用表"):
     """
     顯示 Money Flow 表格。
-    賠率格式：
-    當時賠率 - 一分鐘前賠率 箭咀 - 三分鐘前賠率 箭咀
+    賠率格式：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。
+    每個箭咀比較相鄰兩個時間點。
+    歷史資料未出現時顯示 --。
     """
-
     money_df = calculate_money_flow_only(race_no)
 
     if money_df.empty:
@@ -3541,21 +3536,21 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         return
 
     # ----------------------------------------------------
-    # 1. 賠率格式化
+    # 1. 格式化賠率
     # ----------------------------------------------------
     def format_odds(value):
         if pd.isna(value):
-            return "-"
+            return "--"
         try:
             value = float(value)
             if np.isinf(value):
                 return "SCR"
             return f"{value:.1f}"
         except (TypeError, ValueError):
-            return "-"
+            return "--"
 
     # ----------------------------------------------------
-    # 2. 比較賠率並產生箭咀
+    # 2. 比較相鄰賠率
     # ----------------------------------------------------
     def get_odds_arrow(newer, older):
         try:
@@ -3563,7 +3558,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
             older = float(older)
 
             if not np.isfinite(newer) or not np.isfinite(older):
-                return "-"
+                return "--"
 
             if newer < older:
                 return "↓"
@@ -3573,39 +3568,46 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
                 return "→"
 
         except (TypeError, ValueError):
-            return "-"
+            return "--"
 
     # ----------------------------------------------------
-    # 3. 三階賠率顯示
+    # 3. 五階段賠率顯示
     # ----------------------------------------------------
     def format_odds_change(row):
-        current = row['Odds']
-        one_min = row['OneMinOdds']
-        three_min = row['ThreeMinOdds']
+        odds_values = [
+            row['Odds'],
+            row['OneMinOdds'],
+            row['TwoMinOdds'],
+            row['ThreeMinOdds'],
+            row['FourMinOdds']
+        ]
 
-        if pd.isna(current):
-            return "-"
+        if pd.isna(odds_values[0]):
+            return "--"
 
-        current_str = format_odds(current)
-        one_min_str = format_odds(one_min)
-        three_min_str = format_odds(three_min)
+        parts = [format_odds(odds_values[0])]
 
-        # 當時賠率 vs 一分鐘前賠率
-        arrow_1m = get_odds_arrow(current, one_min)
+        for i in range(1, 5):
+            current_value = odds_values[i]
 
-        # 一分鐘前賠率 vs 三分鐘前賠率
-        arrow_3m = get_odds_arrow(one_min, three_min)
+            if pd.isna(current_value):
+                parts.append("--")
+            else:
+                previous_value = odds_values[i - 1]
+                arrow = get_odds_arrow(
+                    previous_value,
+                    current_value
+                )
+                parts.append(
+                    f"{format_odds(current_value)} {arrow}"
+                )
 
-        return (
-            f"{current_str} - {one_min_str} {arrow_1m} "
-            f"- {three_min_str} {arrow_3m}"
-        )
+        return " - ".join(parts)
 
     # ----------------------------------------------------
     # 4. 建立顯示 DataFrame
     # ----------------------------------------------------
     display_money = money_df.copy()
-
     display_money['賠率變化'] = display_money.apply(
         format_odds_change,
         axis=1
@@ -3629,7 +3631,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         '排位',
         '騎師',
         '練馬師',
-        '賠率變化',
+        '當前賠率',
         '近期資金流'
     ]
 
@@ -3639,20 +3641,18 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
     display_money['近期資金流'] = display_money[
         '近期資金流'
     ].apply(
-        lambda x: f"{x:.1f}k" if pd.notna(x) else "-"
+        lambda x: f"{x:.1f}k" if pd.notna(x) else "--"
     )
 
     # ----------------------------------------------------
-    # 6. 顯示表格
+    # 6. 顯示
     # ----------------------------------------------------
     st.markdown(f"### {title}")
-
-    st.caption(
-        "賠率順序：當時 - 一分鐘前 - 三分鐘前。"
-        "第一個箭咀比較當時與一分鐘前；"
-        "第二個箭咀比較一分鐘前與三分鐘前。  \n"
-        "↓ 賠率下跌，↑ 賠率上升，→ 賠率不變。"
-    )
+    #st.caption(
+    #    "賠率順序：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。  \n"
+    #    "每個箭咀與前一個時間點比較：↓ 下跌，↑ 上升，→ 不變。  \n"
+    #    "未有歷史紀錄會顯示 --。"
+    #)
 
     st.markdown("""
         <style>
