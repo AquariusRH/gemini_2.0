@@ -3643,23 +3643,21 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         lambda x: f"{x:.1f}k" if pd.notna(x) else "--"
     )
     
-    # --- 縮短練馬師名稱，完整名稱保留在 Tooltip ---
+    # --- 建立完整表格 ---
     trainer_full = display_money['練馬師'].fillna("").astype(str)
     
+    # 練馬師名稱超過 6 個字便縮短
     display_money['練馬師'] = trainer_full.apply(
         lambda x: x if len(x) <= 6 else x[:6] + "…"
     )
     
-    # Tooltip 儲存完整練馬師名稱
+    # 建立 Tooltip，保留完整練馬師名稱
     tooltip_df = pd.DataFrame(
         "",
         index=display_money.index,
         columns=display_money.columns
     )
     tooltip_df['練馬師'] = trainer_full
-    
-    # --- 顯示 ---
-    st.markdown(f"### {title}")
     
     styled_money = (
         display_money.style
@@ -3673,21 +3671,39 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
                 "border-radius:4px; white-space:normal;"
             )
         )
-        .set_properties(
-            subset=['練馬師'],
-            **{
-                'white-space': 'nowrap',
-                'max-width': '110px',
-                'overflow': 'hidden',
-                'text-overflow': 'ellipsis'
-            }
-        )
         .set_table_attributes(
-            'style="width:100%; table-layout:fixed;"'
+            'style="width:100%; table-layout:fixed; border-collapse:collapse;"'
         )
+        .set_uuid("money_flow")
     )
     
-    st.table(styled_money)
+    # --- 取消表格內部高度限制及捲動 ---
+    table_html = styled_money.to_html()
+    
+    st.markdown(
+        f"""
+        <style>
+        #T_money_flow {{
+            width: 100%;
+            table-layout: fixed;
+        }}
+        #T_money_flow td,
+        #T_money_flow th {{
+            vertical-align: middle;
+        }}
+        #T_money_flow td:nth-child(5) {{
+            max-width: 110px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }}
+        </style>
+        <div style="height:auto; max-height:none; overflow:visible;">
+            {table_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 GRAPHQL_URL = "https://info.cld.hkjc.com/graphql/base/"
 
