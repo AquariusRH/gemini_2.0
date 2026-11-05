@@ -3638,38 +3638,56 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
     # ----------------------------------------------------
     # 5. 格式化資金流
     # ----------------------------------------------------
-    display_money['近期資金流'] = display_money[
-        '近期資金流'
-    ].apply(
+    
+    display_money['近期資金流'] = display_money['近期資金流'].apply(
         lambda x: f"{x:.1f}k" if pd.notna(x) else "--"
     )
-
-    # ----------------------------------------------------
-    # 6. 顯示
-    # ----------------------------------------------------
+    
+    # --- 縮短練馬師名稱，完整名稱保留在 Tooltip ---
+    trainer_full = display_money['練馬師'].fillna("").astype(str)
+    
+    display_money['練馬師'] = trainer_full.apply(
+        lambda x: x if len(x) <= 6 else x[:6] + "…"
+    )
+    
+    # Tooltip 儲存完整練馬師名稱
+    tooltip_df = pd.DataFrame(
+        "",
+        index=display_money.index,
+        columns=display_money.columns
+    )
+    tooltip_df['練馬師'] = trainer_full
+    
+    # --- 顯示 ---
     st.markdown(f"### {title}")
-    #st.caption(
-    #    "賠率順序：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。  \n"
-    #    "每個箭咀與前一個時間點比較：↓ 下跌，↑ 上升，→ 不變。  \n"
-    #    "未有歷史紀錄會顯示 --。"
-    #)
-
-    st.markdown("""
-        <style>
-        .stTable td {
-            white-space: nowrap !important;
-            vertical-align: middle;
-        }
-        .stTable th {
-            white-space: normal !important;
-            min-width: 60px;
-            font-size: 14px !important;
-            line-height: 1.1;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-    st.table(display_money.style.hide(axis='index'))
+    
+    styled_money = (
+        display_money.style
+        .hide(axis='index')
+        .set_tooltips(
+            tooltip_df,
+            props=(
+                "visibility:hidden; position:absolute; z-index:100; "
+                "background-color:#222; color:white; "
+                "border:1px solid #666; padding:5px; "
+                "border-radius:4px; white-space:normal;"
+            )
+        )
+        .set_properties(
+            subset=['練馬師'],
+            **{
+                'white-space': 'nowrap',
+                'max-width': '110px',
+                'overflow': 'hidden',
+                'text-overflow': 'ellipsis'
+            }
+        )
+        .set_table_attributes(
+            'style="width:100%; table-layout:fixed;"'
+        )
+    )
+    
+    st.table(styled_money)
 
 GRAPHQL_URL = "https://info.cld.hkjc.com/graphql/base/"
 
