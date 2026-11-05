@@ -3406,11 +3406,11 @@ def print_prediction_table(race_no, title="🎯實時資金流綜合預測排名
     
 def calculate_money_flow_only(race_no):
     """
-    只計算並回傳 Money Flow 相關資料，不計算 Static Score。
-    自動過濾當刻賠率為 inf 的退出馬匹。
-    賠率歷史：當刻、1、2、3、4 分鐘前。
-    每分鐘按 4 格計算，歷史資料不足時保留 NaN，不使用最早一筆代替。
+    只計算 Money Flow，不計算 Static Score。
+    五階段 WIN 賠率：當刻、1、2、3、4 分鐘前。
+    每分鐘按 4 格取樣；歷史資料不足顯示 NaN。
     """
+    # 1. 取得 WIN 賠率
     odds_dict = st.session_state.get('odds_dict', {})
     if 'WIN' not in odds_dict or odds_dict['WIN'].empty:
         return pd.DataFrame()
@@ -3418,7 +3418,7 @@ def calculate_money_flow_only(race_no):
     odds_df = odds_dict['WIN'].copy().sort_index()
     latest_odds = odds_df.iloc[-1].rename('Odds')
 
-    # 每分鐘 4 格：0、4、8、12、16 格前
+    # 每分鐘 4 格：當刻、4、8、12、16 格前
     odds_columns = {
         'Odds': 0,
         'OneMinOdds': 4,
@@ -3439,11 +3439,9 @@ def calculate_money_flow_only(race_no):
                 name=column
             )
 
-    # ----------------------------------------------------
-    # 1. 計算 Money Flow（近期 10 筆）
-    # ----------------------------------------------------
+    # 2. 計算 Money Flow（近期 10 筆）
     total_money_flow = pd.DataFrame(
-        0,
+        0.0,
         index=latest_odds.index,
         columns=['MoneyFlow']
     )
@@ -3459,9 +3457,7 @@ def calculate_money_flow_only(race_no):
                 )
             )
 
-    # ----------------------------------------------------
-    # 2. 建立基礎 DataFrame
-    # ----------------------------------------------------
+    # 3. 合併賠率及資金流
     df = pd.concat(
         [
             odds_series['Odds'],
@@ -3474,32 +3470,35 @@ def calculate_money_flow_only(race_no):
         axis=1
     )
 
-    # 過濾退出馬匹：只根據當刻賠率判斷
+    # 只根據當刻賠率過濾退出馬匹
     df = df[~df['Odds'].isin([np.inf, -np.inf])]
     df = df[pd.notna(df['Odds'])]
 
     if df.empty:
         return pd.DataFrame()
 
-    # ----------------------------------------------------
-    # 3. 加入基本靜態資訊
-    # ----------------------------------------------------
+    # 4. 加入馬匹基本資料
     race_dataframes = st.session_state.get('race_dataframes', {})
     static_df = race_dataframes.get(race_no)
 
     if static_df is None:
         static_df = race_dataframes.get(str(race_no))
 
-    if static_df is None:
+    if static_df is None or static_df.empty:
         return pd.DataFrame()
 
     static_df = static_df.copy()
 
     try:
         df.index = df.index.astype(str)
-        if static_df.index.name != '馬號':
+
+        if '馬號' in static_df.columns:
+            static_df = static_df.set_index('馬號')
+        elif static_df.index.name != '馬號':
             static_df = static_df.reset_index().set_index('馬號')
+
         static_df.index = static_df.index.astype(str)
+
     except Exception as e:
         st.error(f"索引轉換錯誤: {e}")
         return pd.DataFrame()
@@ -3509,11 +3508,10 @@ def calculate_money_flow_only(race_no):
         col for col in basic_cols
         if col in static_df.columns
     ]
+
     df = df.join(static_df[available_cols], how='left')
 
-    # ----------------------------------------------------
-    # 4. 智慧排序
-    # ----------------------------------------------------
+    # 5. 排序
     if (df['MoneyFlow'] == 0).all():
         df = df.sort_values('Odds', ascending=True)
     else:
@@ -3525,9 +3523,10 @@ def calculate_money_flow_only(race_no):
 def print_money_table(race_no, title="💰 Money Flow 專用表"):
     """
     顯示 Money Flow 表格。
-    賠率格式：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。
-    每個箭咀比較相鄰兩個時間點。
-    歷史資料未出現時顯示 --。
+    五階段賠率：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。
+    每個箭咀比較相鄰時間點。
+    歷史資料不足顯示 --。
+    不限制顯示行數，不設表格內部捲動。
     """
     money_df = calculate_money_flow_only(race_no)
 
@@ -3535,9 +3534,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         st.warning(f"第 {race_no} 場目前沒有 Money Flow 資料")
         return
 
-    # ----------------------------------------------------
     # 1. 格式化賠率
-    # ----------------------------------------------------
     def format_odds(value):
         if pd.isna(value):
             return "--"
@@ -3549,9 +3546,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         except (TypeError, ValueError):
             return "--"
 
-    # ----------------------------------------------------
     # 2. 比較相鄰賠率
-    # ----------------------------------------------------
     def get_odds_arrow(newer, older):
         try:
             newer = float(newer)
@@ -3570,9 +3565,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         except (TypeError, ValueError):
             return "--"
 
-    # ----------------------------------------------------
-    # 3. 五階段賠率顯示
-    # ----------------------------------------------------
+    # 3. 五階段賠率格式
     def format_odds_change(row):
         odds_values = [
             row['Odds'],
@@ -3604,9 +3597,7 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
 
         return " - ".join(parts)
 
-    # ----------------------------------------------------
     # 4. 建立顯示 DataFrame
-    # ----------------------------------------------------
     display_money = money_df.copy()
     display_money['賠率變化'] = display_money.apply(
         format_odds_change,
@@ -3635,30 +3626,28 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         '近期資金流'
     ]
 
-    # ----------------------------------------------------
     # 5. 格式化資金流
-    # ----------------------------------------------------
-    
-    display_money['近期資金流'] = display_money['近期資金流'].apply(
+    display_money['近期資金流'] = display_money[
+        '近期資金流'
+    ].apply(
         lambda x: f"{x:.1f}k" if pd.notna(x) else "--"
     )
-    
-    # --- 建立完整表格 ---
-    trainer_full = display_money['練馬師'].fillna("").astype(str)
-    
-    # 練馬師名稱超過 6 個字便縮短
+
+    # 6. 練馬師名稱縮短，完整名稱放在 Tooltip
+    trainer_full = display_money['練馬師'].fillna('').astype(str)
+
     display_money['練馬師'] = trainer_full.apply(
-        lambda x: x if len(x) <= 6 else x[:6] + "…"
+        lambda x: x if len(x) <= 6 else x[:6] + '…'
     )
-    
-    # 建立 Tooltip，保留完整練馬師名稱
+
     tooltip_df = pd.DataFrame(
-        "",
+        '',
         index=display_money.index,
         columns=display_money.columns
     )
     tooltip_df['練馬師'] = trainer_full
-    
+
+    # 7. 建立 Pandas Styler
     styled_money = (
         display_money.style
         .hide(axis='index')
@@ -3671,39 +3660,61 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
                 "border-radius:4px; white-space:normal;"
             )
         )
-        .set_table_attributes(
-            'style="width:100%; table-layout:fixed; border-collapse:collapse;"'
+        .set_properties(
+            subset=['練馬師'],
+            **{
+                'white-space': 'nowrap',
+                'max-width': '110px',
+                'overflow': 'hidden',
+                'text-overflow': 'ellipsis'
+            }
         )
-        .set_uuid("money_flow")
+        .set_properties(
+            subset=['當前賠率'],
+            **{
+                'white-space': 'normal',
+                'min-width': '190px',
+                'line-height': '1.6'
+            }
+        )
+        .set_table_attributes(
+            'style="width:100%; border-collapse:collapse;"'
+        )
     )
-    
-    # --- 取消表格內部高度限制及捲動 ---
+
+    # 8. 顯示標題及說明
+    st.markdown(f"### {title}")
+    st.caption(
+        "賠率順序：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。  \n"
+        "每個箭咀與前一個時間點比較：↓ 下跌，↑ 上升，→ 不變。  \n"
+        "未有歷史紀錄會顯示 --。"
+    )
+
+    # 9. CSS：不限制高度、不設內部捲動
+    table_css = """
+    <style>
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    th, td {
+        padding: 8px 5px !important;
+        vertical-align: middle !important;
+    }
+    th {
+        white-space: normal !important;
+        font-size: 14px !important;
+    }
+    td {
+        white-space: nowrap;
+    }
+    </style>
+    """
+
+    # 10. HTML 顯示完整表格
     table_html = styled_money.to_html()
-    
-    st.markdown(
-        f"""
-        <style>
-        #T_money_flow {{
-            width: 100%;
-            table-layout: fixed;
-        }}
-        #T_money_flow td,
-        #T_money_flow th {{
-            vertical-align: middle;
-        }}
-        #T_money_flow td:nth-child(5) {{
-            max-width: 110px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }}
-        </style>
-        <div style="height:auto; max-height:none; overflow:visible;">
-            {table_html}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.html(table_css + table_html)
 
 GRAPHQL_URL = "https://info.cld.hkjc.com/graphql/base/"
 
