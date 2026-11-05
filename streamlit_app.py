@@ -2281,73 +2281,49 @@ def print_henery_model(gamma=1.18):
         st.success("目前沒有過熱組合")
 
     # =========================================================
-    # 9. 第二張圖：個別馬匹過熱組合
+    # 9. 第二張圖：個別馬匹過熱組合（按鈕式切換）
     # =========================================================
     st.markdown("---")
     st.subheader("🐎 ② 個別馬匹過熱組合")
-
+    
     horse_fig = go.Figure()
     horse_buttons = []
-
-    horse_row_counts = []
-
+    
     for i, horse_no in enumerate(all_horse_list):
-
         sub_df = ov_df[
             ov_df["組合"].apply(
-                lambda x: combination_contains_horse(
-                    x, horse_no
-                )
+                lambda x: combination_contains_horse(x, horse_no)
             )
         ].copy()
-
-        sub_df = (
-            sub_df
-            .sort_values(
-                ["Value", "實時Q"],
-                ascending=[True, True]
-            )
-            .reset_index(drop=True)
-        )
-
-        horse_row_counts.append(max(1, len(sub_df)))
-
+    
+        sub_df = sub_df.sort_values(
+            ["Value", "實時Q"],
+            ascending=[True, True]
+        ).reset_index(drop=True)
+    
         if not sub_df.empty:
-
-            val_bg_colors, val_font_colors = (
-                get_adaptive_colors(sub_df["Value"])
+            val_bg_colors, val_font_colors = get_adaptive_colors(
+                sub_df["Value"]
             )
-
             init_font_colors = get_rank_font_colors(
                 sub_df["最初排名"]
             )
-
             prev_font_colors = get_rank_font_colors(
                 sub_df["上一次排名"]
             )
-
+    
             horse_fig.add_trace(
                 go.Table(
-                    columnwidth=[
-                        100, 75, 85, 85, 80, 90, 75
-                    ],
                     header=dict(
                         values=[
-                            "<b>組合</b>",
-                            "<b>排名</b>",
-                            "<b>最初</b>",
-                            "<b>上一次</b>",
-                            "<b>實時Q</b>",
-                            "<b>理論Q</b>",
+                            "<b>組合</b>", "<b>排名</b>",
+                            "<b>最初</b>", "<b>上一次</b>",
+                            "<b>實時Q</b>", "<b>理論Q</b>",
                             "<b>Value</b>"
                         ],
                         fill_color="#111111",
                         align="center",
-                        font=dict(
-                            color="white",
-                            size=16
-                        ),
-                        line_color="#333333",
+                        font=dict(color="white", size=15),
                         height=38
                     ),
                     cells=dict(
@@ -2361,14 +2337,8 @@ def print_henery_model(gamma=1.18):
                             sub_df["Value"]
                         ],
                         fill_color=[
-                            ["rgba(30,30,30,0.5)"] * len(sub_df),
-                            ["rgba(30,30,30,0.5)"] * len(sub_df),
-                            ["rgba(30,30,30,0.5)"] * len(sub_df),
-                            ["rgba(30,30,30,0.5)"] * len(sub_df),
-                            ["rgba(30,30,30,0.5)"] * len(sub_df),
-                            ["rgba(30,30,30,0.5)"] * len(sub_df),
-                            val_bg_colors
-                        ],
+                            ["rgba(30,30,30,0.5)"] * len(sub_df)
+                        ] * 6 + [val_bg_colors],
                         font=dict(
                             color=[
                                 ["white"] * len(sub_df),
@@ -2379,116 +2349,104 @@ def print_henery_model(gamma=1.18):
                                 ["white"] * len(sub_df),
                                 val_font_colors
                             ],
-                            size=16
+                            size=15
                         ),
                         align="center",
-                        line_color="#333333",
-                        height=42
+                        height=40,
+                        line_color="#333333"
                     ),
                     visible=(i == 0)
                 )
             )
-
         else:
-
             horse_fig.add_trace(
                 go.Table(
                     header=dict(
                         values=["<b>狀態</b>"],
                         fill_color="#111111",
-                        font=dict(color="white", size=16)
+                        font=dict(color="white", size=15)
                     ),
                     cells=dict(
-                        values=[
-                            [f"{horse_no} 號馬目前沒有過熱組合"]
-                        ],
-                        fill_color=[
-                            "rgba(30,30,30,0.5)"
-                        ],
-                        font=dict(
-                            color="#999999",
-                            size=17
-                        ),
-                        height=50
+                        values=[[f"{horse_no} 號馬目前沒有過熱組合"]],
+                        fill_color=["rgba(30,30,30,0.5)"],
+                        font=dict(color="#999999", size=15),
+                        height=45
                     ),
                     visible=(i == 0)
                 )
             )
-
-    # Plotly 下拉選單：只在瀏覽器端切換
-    for i, horse_no in enumerate(all_horse_list):
-
+    
+        # 每匹馬一個按鈕
         visible_list = [
-            j == i
-            for j in range(len(all_horse_list))
+            j == i for j in range(len(all_horse_list))
         ]
-
-        count = len(
-            ov_df[
-                ov_df["組合"].apply(
-                    lambda x: combination_contains_horse(
-                        x, horse_no
-                    )
-                )
-            ]
+    
+        count = len(sub_df)
+    
+        horse_buttons.append(
+            dict(
+                label=f"{horse_no:02d} 號 ({count})",
+                method="update",
+                args=[
+                    {"visible": visible_list},
+                    {
+                        "title": {
+                            "text": f"<b>{horse_no:02d} 號馬過熱組合</b>"
+                        }
+                    }
+                ]
+            )
         )
-
-        horse_buttons.append({
-            "label": f"{horse_no:02d} 號 ({count})",
-            "method": "update",
-            "args": [
-                {"visible": visible_list},
-                {
-                    "title": (
-                        f"<b>正在檢視：{horse_no} 號馬過熱組合</b>"
+    
+    # 動態高度
+    max_rows = max(
+        [
+            len(
+                ov_df[
+                    ov_df["組合"].apply(
+                        lambda x: combination_contains_horse(x, h)
                     )
-                }
-            ]
-        })
-
-    max_rows = max(horse_row_counts) if horse_row_counts else 1
-
-    horse_height = 85 + max_rows * 42
-
+                ]
+            )
+            for h in all_horse_list
+        ] or [1]
+    )
+    
     horse_fig.update_layout(
         title=dict(
-            text=f"<b>正在檢視：{all_horse_list[0]} 號馬過熱組合</b>",
+            text=f"<b>{all_horse_list[0]:02d} 號馬過熱組合</b>",
             font=dict(color="white", size=17)
         ),
         updatemenus=[
             dict(
-                type="dropdown",
-                direction="down",
-                x=0,
-                xanchor="left",
-                y=1.16,
-                yanchor="top",
+                type="buttons",
+                direction="right",
                 buttons=horse_buttons,
                 showactive=True,
+                x=0,
+                xanchor="left",
+                y=1.18,
+                yanchor="top",
                 bgcolor="#333333",
-                font=dict(color="white", size=14),
-                bordercolor="#555555"
+                bordercolor="#666666",
+                font=dict(color="white", size=12),
+                pad=dict(r=3, t=3),
+                active=0
             )
         ],
-        margin=dict(
-            t=100,
-            b=10,
-            l=5,
-            r=5
-        ),
-        height=horse_height,
+        margin=dict(t=110, b=10, l=5, r=5),
+        height=110 + max_rows * 40,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="white")
     )
-
-    if all_horse_list:
-        st.plotly_chart(
-            horse_fig,
-            width="stretch",
-            key=f"henery_horse_{race_no_local}",
-            config={"displayModeBar": False}
-        )
+    
+    st.plotly_chart(
+        horse_fig,
+        width="stretch",
+        key=f"henery_horse_{race_no_local}",
+        config={"displayModeBar": False}
+    )
 
     # =========================================================
     # 10. 第三張圖：記錄每匹馬的過熱組合數量
