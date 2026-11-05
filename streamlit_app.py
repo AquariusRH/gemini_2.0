@@ -1996,30 +1996,21 @@ def get_rank_font_colors(series):
     return colors
 def print_henery_model(gamma=1.18):
     """
-    Henery Model Dashboard
-    ① 全場過熱組合
-    ② 個別馬匹過熱組合（Plotly 瀏覽器端切換，不觸發 Streamlit rerun）
-    ③ 全場馬匹過熱組合數量歷史 Heatmap
+    Henery Model
+    1. 保留原本 Henery 計算公式
+    2. 全場過熱組合
+    3. 個別馬匹過熱組合：Plotly 按鈕切換，不觸發 Streamlit rerun
+    4. 歷史 Heatmap：按過熱組合數量排序，並顯示現時及之前賠率
+    5. 個別馬匹表格高度按實際行數自動調整
     """
 
     # =========================================================
-    # 1. 基本設定及時間
+    # 1. 時間處理
     # =========================================================
-    race_no_local = globals().get(
-        "race_no",
-        st.session_state.get("race_no")
-    )
-
-    if race_no_local is None:
-        st.warning("找不到目前場次 race_no")
-        return pd.DataFrame()
-
     HK_TZ = timezone(timedelta(hours=8))
     now = datetime.now(HK_TZ)
 
-    post_time_raw = st.session_state.get(
-        "post_time_dict", {}
-    ).get(race_no_local)
+    post_time_raw = st.session_state.post_time_dict.get(race_no)
 
     if post_time_raw:
         post_time = (
@@ -2037,90 +2028,81 @@ def print_henery_model(gamma=1.18):
         time_str = "未載入"
 
     last_upd = (
-        st.session_state.last_update.strftime("%H:%M:%S")
-        if st.session_state.get("last_update")
+        st.session_state.last_update.strftime('%H:%M:%S')
+        if st.session_state.get('last_update')
         else "N/A"
     )
 
-    st.markdown(
-        f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`"
-    )
+    st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
 
     # =========================================================
-    # 2. 取得 WIN / QIN 數據
+    # 2. 數據檢查
     # =========================================================
-    odds_dict = st.session_state.get("odds_dict", {})
+    if 'odds_dict' not in st.session_state:
+        return pd.DataFrame()
 
-    win_df = odds_dict.get("WIN")
-    qin_df = odds_dict.get("QIN")
+    win_df = st.session_state.odds_dict.get('WIN')
+    qin_df = st.session_state.odds_dict.get('QIN')
 
     if (
         win_df is None or qin_df is None
         or win_df.empty or qin_df.empty
     ):
-        st.info("目前沒有足夠的 WIN / QIN 數據")
         return pd.DataFrame()
 
     # =========================================================
-    # 3. 計算 WIN 機率
+    # 3. 處理 WIN 獨贏賠率
     # =========================================================
     latest_win = win_df.iloc[-1]
 
     win_probs = {}
     win_odds_map = {}
-    inv_sum = 0.0
+    inv_sum = 0
 
     for col, odds in latest_win.items():
         try:
-            horse_no = int(float(str(col).strip()))
-            value = pd.to_numeric(odds, errors="coerce")
+            h_num = int(float(str(col).strip()))
+            val = pd.to_numeric(odds, errors='coerce')
 
-            if (
-                pd.notna(value)
-                and value > 0
-                and np.isfinite(value)
-            ):
-                win_probs[horse_no] = 1.0 / value
-                win_odds_map[horse_no] = float(value)
-                inv_sum += 1.0 / value
+            if pd.notna(val) and val > 0 and np.isfinite(val):
+                win_probs[h_num] = 1.0 / val
+                win_odds_map[h_num] = float(val)
+                inv_sum += 1.0 / val
 
         except (ValueError, TypeError):
             continue
 
     if inv_sum == 0:
-        st.info("目前沒有有效的獨贏賠率")
         return pd.DataFrame()
 
-    for horse_no in win_probs:
-        win_probs[horse_no] /= inv_sum
-
-    horses = sorted(win_probs.keys())
+    for h in win_probs:
+        win_probs[h] /= inv_sum
 
     # =========================================================
-    # 4. 處理 QIN 賠率
+    # 4. 處理 QIN 連贏賠率
     # =========================================================
     latest_qin = qin_df.iloc[-1]
     actual_qin = {}
 
     for comb_col, odds in latest_qin.items():
-        value = pd.to_numeric(odds, errors="coerce")
+        val = pd.to_numeric(odds, errors='coerce')
 
-        if pd.notna(value) and value > 0:
-            nums = re.findall(r"\d+", str(comb_col))
+        if pd.notna(val) and val > 0 and np.isfinite(val):
+            nums = re.findall(r'\d+', str(comb_col))
 
             if len(nums) == 2:
-                n1, n2 = sorted([
-                    int(nums[0]),
-                    int(nums[1])
-                ])
-                actual_qin[(n1, n2)] = float(value)
+                n1, n2 = int(nums[0]), int(nums[1])
+                key = tuple(sorted([n1, n2]))
+                actual_qin[key] = float(val)
 
     # =========================================================
     # 5. Henery Model 計算
     # =========================================================
     results = []
+    horses = sorted(win_probs.keys())
 
     for h1, h2 in itertools.combinations(horses, 2):
+
         p1 = win_probs[h1]
         p2 = win_probs[h2]
 
@@ -2128,6 +2110,7 @@ def print_henery_model(gamma=1.18):
             win_probs[h] ** gamma
             for h in horses if h != h1
         )
+
         denom2 = sum(
             win_probs[h] ** gamma
             for h in horses if h != h2
@@ -2144,562 +2127,778 @@ def print_henery_model(gamma=1.18):
         if p_qin <= 0:
             continue
 
-        theoretical_odds = 1.0 / p_qin
+        theo_odds = 1.0 / p_qin
         actual_odds = actual_qin.get((h1, h2))
 
         if actual_odds is not None:
-            value_score = actual_odds / theoretical_odds
+            val_score = actual_odds / theo_odds
 
             results.append({
                 "組合": f"{h1}-{h2}",
                 "實時Q": actual_odds,
-                "理論Q": round(theoretical_odds, 1),
-                "Value": round(value_score, 2)
+                "理論Q": round(theo_odds, 1),
+                "Value": round(val_score, 2)
             })
 
-    if not results:
-        st.info("目前沒有可計算的 QIN 組合")
-        return pd.DataFrame()
-
-    full_df = pd.DataFrame(results)
-
     # =========================================================
-    # 6. 加入原本的排名資料
+    # 6. 取得原本排名資料
     # =========================================================
-    investment_dict = st.session_state.get(
-        "investment_dict", {}
+    plus_df_clean = pd.DataFrame(
+        columns=['組合', '排名', '最初排名', '上一次排名']
     )
 
-    try:
-        tables = top(
-            qin_df,
-            investment_dict.get("QIN"),
-            "QIN"
-        )
-        plus_df = tables.get("plus_df")
+    investment_df = st.session_state.get(
+        'investment_dict', {}
+    ).get('QIN')
 
-    except Exception as e:
-        st.warning(f"取得 QIN 排名資料失敗：{e}")
-        plus_df = pd.DataFrame()
+    if (
+        not qin_df.empty
+        and investment_df is not None
+        and not investment_df.empty
+    ):
+        try:
+            tables = top(
+                st.session_state.odds_dict["QIN"],
+                investment_df,
+                "QIN"
+            )
 
-    rank_cols = [
-        "組合",
-        "排名",
-        "最初排名",
-        "上一次排名"
-    ]
+            plus_df = tables.get("plus_df")
 
-    if plus_df is not None and not plus_df.empty:
+            if (
+                isinstance(plus_df, pd.DataFrame)
+                and not plus_df.empty
+                and '組合' in plus_df.columns
+            ):
+                for col in ['排名', '最初排名', '上一次排名']:
+                    if col not in plus_df.columns:
+                        plus_df[col] = ''
 
-        plus_df_clean = plus_df.copy()
+                plus_df_clean = plus_df[
+                    ['組合', '排名', '最初排名', '上一次排名']
+                ].copy()
 
-        available_rank_cols = [
-            c for c in rank_cols
-            if c in plus_df_clean.columns
-        ]
+                def normalize_comb(comb_str):
+                    nums = re.findall(r'\d+', str(comb_str))
 
-        plus_df_clean = plus_df_clean[
-            available_rank_cols
-        ]
+                    if len(nums) == 2:
+                        n1, n2 = sorted(
+                            [int(nums[0]), int(nums[1])]
+                        )
+                        return f"{n1}-{n2}"
 
-        def normalize_comb(comb):
-            nums = re.findall(r"\d+", str(comb))
+                    return comb_str
 
-            if len(nums) == 2:
-                n1, n2 = sorted([
-                    int(nums[0]),
-                    int(nums[1])
-                ])
-                return f"{n1}-{n2}"
+                plus_df_clean['組合'] = (
+                    plus_df_clean['組合'].apply(normalize_comb)
+                )
 
-            return str(comb)
+        except Exception as e:
+            st.warning(f"排名資料暫時無法載入：{e}")
 
-        plus_df_clean["組合"] = (
-            plus_df_clean["組合"].apply(normalize_comb)
-        )
+    # =========================================================
+    # 7. 建立完整 DataFrame
+    # =========================================================
+    full_df = pd.DataFrame(
+        results,
+        columns=['組合', '實時Q', '理論Q', 'Value']
+    )
+
+    if not full_df.empty:
 
         full_df = pd.merge(
             full_df,
             plus_df_clean,
-            on="組合",
-            how="left"
+            on='組合',
+            how='left'
         )
 
-    else:
-        full_df["排名"] = "--"
-        full_df["最初排名"] = "--"
-        full_df["上一次排名"] = "--"
+        for col in ['排名', '最初排名', '上一次排名']:
+            if col not in full_df.columns:
+                full_df[col] = ''
 
-    for col in ["排名", "最初排名", "上一次排名"]:
-        if col not in full_df.columns:
-            full_df[col] = "--"
-
-    full_df = full_df[
-        [
-            "組合",
-            "排名",
-            "最初排名",
-            "上一次排名",
-            "實時Q",
-            "理論Q",
-            "Value"
+        full_df = full_df[
+            [
+                '組合', '排名', '最初排名', '上一次排名',
+                '實時Q', '理論Q', 'Value'
+            ]
         ]
-    ]
 
-    full_df = full_df[
-        full_df["實時Q"] < 100
-    ].copy()
+        full_df = full_df[
+            pd.to_numeric(full_df['實時Q'], errors='coerce') < 100
+        ]
 
-    if full_df.empty:
-        st.info("目前沒有符合條件的 QIN 組合")
-        return full_df
-
-    # =========================================================
-    # 7. 共用工具：分析組合包含哪匹馬
-    # =========================================================
-    def combination_contains_horse(combination, horse_no):
-        nums = re.findall(r"\d+", str(combination))
-
-        return (
-            len(nums) == 2
-            and int(horse_no) in [
-                int(nums[0]),
-                int(nums[1])
+    else:
+        full_df = pd.DataFrame(
+            columns=[
+                '組合', '排名', '最初排名', '上一次排名',
+                '實時Q', '理論Q', 'Value'
             ]
         )
 
-    # 全部過熱組合
+    # =========================================================
+    # 8. 全場過熱組合
+    # =========================================================
+    st.error("🔥 **過熱組合 (Value < 0.9)**")
+
     ov_df = full_df[
-        full_df["Value"] < 0.9
+        pd.to_numeric(full_df['Value'], errors='coerce') < 0.9
     ].copy()
 
-    all_horse_list = sorted(win_probs.keys())
-
-    # =========================================================
-    # 8. 第一張圖：全場過熱組合
-    # =========================================================
-    st.markdown("---")
-    st.subheader("🔥 ① 全場過熱組合")
-
-    if not ov_df.empty:
-
-        overall_df = (
-            ov_df
-            .sort_values(
-                ["實時Q", "Value"],
-                ascending=[True, True]
-            )
-            .head(25)
-            .reset_index(drop=True)
-        )
-
-        overall_html = (
-            overall_df.style
+    def get_table_html(df, cmap_name):
+        return (
+            df.style
             .background_gradient(
-                subset=["Value"],
-                cmap="Reds_r"
+                subset=['Value'],
+                cmap=cmap_name
             )
             .format({
                 "實時Q": "{:.1f}",
                 "理論Q": "{:.1f}",
                 "Value": "{:.2f}"
             })
-            .hide(axis="index")
+            .hide(axis='index')
             .map(
                 highlight_change,
-                subset=["最初排名", "上一次排名"]
+                subset=['最初排名', '上一次排名']
             )
             .set_table_attributes(
-                'style="width:100%; border-collapse:collapse; '
-                'white-space:nowrap;"'
+                'style="width:100%; border-collapse:collapse; white-space:nowrap;"'
             )
             .to_html()
         )
 
+    if not ov_df.empty:
+
+        # 保留原本全場最多顯示 25 個過熱組合
+        overheated_df = (
+            ov_df.sort_values(
+                ['Value', '實時Q'],
+                ascending=[True, True]
+            ).head(25)
+        )
+
         st.markdown(
-            overall_html,
+            get_table_html(overheated_df, 'Reds_r'),
             unsafe_allow_html=True
         )
 
     else:
-        st.success("目前沒有過熱組合")
+        st.info("目前無過熱組合")
 
     # =========================================================
-    # 9. 第二張圖：個別馬匹過熱組合（按鈕式切換）
+    # 9. 個別馬匹過熱組合
     # =========================================================
     st.markdown("---")
-    st.subheader("🐎 ② 個別馬匹過熱組合")
-    time_str_show()
-    horse_fig = go.Figure()
-    horse_buttons = []
-    
-    for i, horse_no in enumerate(all_horse_list):
-        sub_df = ov_df[
-            ov_df["組合"].apply(
-                lambda x: combination_contains_horse(x, horse_no)
-            )
-        ].copy()
-    
-        sub_df = sub_df.sort_values(
-            ["Value", "實時Q"],
-            ascending=[True, True]
-        ).reset_index(drop=True)
-    
-        if not sub_df.empty:
-            val_bg_colors, val_font_colors = get_adaptive_colors(
-                sub_df["Value"]
-            )
-            init_font_colors = get_rank_font_colors(
-                sub_df["最初排名"]
-            )
-            prev_font_colors = get_rank_font_colors(
-                sub_df["上一次排名"]
-            )
-    
-            horse_fig.add_trace(
-                go.Table(
-                    header=dict(
-                        values=[
-                            "<b>組合</b>", "<b>排名</b>",
-                            "<b>最初</b>", "<b>上一次</b>",
-                            "<b>實時Q</b>", "<b>理論Q</b>",
-                            "<b>Value</b>"
-                        ],
-                        fill_color="#111111",
-                        align="center",
-                        font=dict(color="white", size=15),
-                        height=38
-                    ),
-                    cells=dict(
-                        values=[
-                            sub_df["組合"],
-                            sub_df["排名"],
-                            sub_df["最初排名"],
-                            sub_df["上一次排名"],
-                            sub_df["實時Q"],
-                            sub_df["理論Q"],
-                            sub_df["Value"]
-                        ],
-                        fill_color=[
-                            ["rgba(30,30,30,0.5)"] * len(sub_df)
-                        ] * 6 + [val_bg_colors],
-                        font=dict(
-                            color=[
-                                ["white"] * len(sub_df),
-                                ["white"] * len(sub_df),
-                                init_font_colors,
-                                prev_font_colors,
-                                ["white"] * len(sub_df),
-                                ["white"] * len(sub_df),
-                                val_font_colors
-                            ],
-                            size=15
-                        ),
-                        align="center",
-                        height=40,
-                        line_color="#333333"
-                    ),
-                    visible=(i == 0)
-                )
-            )
-        else:
-            horse_fig.add_trace(
-                go.Table(
-                    header=dict(
-                        values=["<b>狀態</b>"],
-                        fill_color="#111111",
-                        font=dict(color="white", size=15)
-                    ),
-                    cells=dict(
-                        values=[[f"{horse_no} 號馬目前沒有過熱組合"]],
-                        fill_color=["rgba(30,30,30,0.5)"],
-                        font=dict(color="#999999", size=15),
-                        height=45
-                    ),
-                    visible=(i == 0)
-                )
-            )
-    
-        # 每匹馬一個按鈕
-        visible_list = [
-            j == i for j in range(len(all_horse_list))
-        ]
-    
-        count = len(sub_df)
-    
-        horse_buttons.append(
-            dict(
-                label=f"{horse_no:02d} 號 ({count})",
-                method="update",
-                args=[
-                    {"visible": visible_list},
-                    {
-                        "title": {
-                            "text": f"<b>{horse_no:02d} 號馬過熱組合</b>"
-                        }
-                    }
+    st.subheader("🔥 個別馬匹過熱組合")
+
+    all_horse_list = sorted(win_probs.keys())
+    num_horses = len(all_horse_list)
+
+    if num_horses > 0:
+
+        fig = go.Figure()
+        horse_sub_dfs = []
+
+        # 每匹馬只建立一個 Table Trace
+        for h_num in all_horse_list:
+
+            mask = ov_df['組合'].apply(
+                lambda x: h_num in [
+                    int(n) for n in re.findall(r'\d+', str(x))
                 ]
+            )
+
+            sub_df = (
+                ov_df[mask]
+                .sort_values('Value', ascending=True)
+                .reset_index(drop=True)
+            )
+
+            horse_sub_dfs.append(sub_df)
+
+            if not sub_df.empty:
+
+                val_bg_colors, val_font_colors = get_adaptive_colors(
+                    sub_df["Value"]
+                )
+
+                init_font_colors = get_rank_font_colors(
+                    sub_df["最初排名"]
+                )
+
+                prev_font_colors = get_rank_font_colors(
+                    sub_df["上一次排名"]
+                )
+
+                fig.add_trace(
+                    go.Table(
+                        columnwidth=[100, 65, 85, 85, 80, 80, 75],
+
+                        header=dict(
+                            values=[
+                                "<b>組合</b>",
+                                "<b>排名</b>",
+                                "<b>最初</b>",
+                                "<b>上一次</b>",
+                                "<b>實時Q</b>",
+                                "<b>理論Q</b>",
+                                "<b>Value</b>"
+                            ],
+                            fill_color='#111111',
+                            align='center',
+                            font=dict(
+                                color='white',
+                                size=19
+                            ),
+                            line_color='#333333',
+                            height=48
+                        ),
+
+                        cells=dict(
+                            values=[
+                                sub_df["組合"],
+                                sub_df["排名"],
+                                sub_df["最初排名"],
+                                sub_df["上一次排名"],
+                                sub_df["實時Q"],
+                                sub_df["理論Q"],
+                                sub_df["Value"]
+                            ],
+
+                            fill_color=[
+                                ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                ['rgba(30,30,30,0.5)'] * len(sub_df),
+                                val_bg_colors
+                            ],
+
+                            font=dict(
+                                color=[
+                                    ['white'] * len(sub_df),
+                                    ['white'] * len(sub_df),
+                                    init_font_colors,
+                                    prev_font_colors,
+                                    ['white'] * len(sub_df),
+                                    ['white'] * len(sub_df),
+                                    val_font_colors
+                                ],
+                                size=18
+                            ),
+
+                            align='center',
+                            line_color='#333333',
+                            height=45
+                        ),
+
+                        visible=(len(fig.data) == 0),
+                        domain=dict(x=[0, 1])
+                    )
+                )
+
+            else:
+
+                fig.add_trace(
+                    go.Table(
+                        header=dict(
+                            values=["<b>狀態提示</b>"],
+                            fill_color='#111111',
+                            font=dict(color='white', size=19),
+                            height=48
+                        ),
+                        cells=dict(
+                            values=[
+                                [f"馬匹 {h_num} 號目前沒有過熱組合"]
+                            ],
+                            fill_color=['rgba(30,30,30,0.5)'],
+                            font=dict(
+                                color='#aaaaaa',
+                                size=20
+                            ),
+                            height=60
+                        ),
+                        visible=(len(fig.data) == 0),
+                        domain=dict(x=[0, 1])
+                    )
+                )
+
+        # -----------------------------------------------------
+        # 按鈕設定
+        # -----------------------------------------------------
+        buttons_per_row = 7
+
+        menu_rows = (
+            num_horses + buttons_per_row - 1
+        ) // buttons_per_row
+
+        menu_list = []
+
+        # 預留空間只按按鈕行數，不按最多組合數量
+        top_margin = 45 + menu_rows * 45
+
+        def get_dynamic_height(row_count):
+            """
+            按目前選中的馬匹實際組合數量調整圖表高度。
+            不使用所有馬匹中最多組合數量作固定高度。
+            """
+            table_header_height = 48
+            table_row_height = 45
+            bottom_margin = 25
+
+            return (
+                top_margin
+                + table_header_height
+                + max(1, row_count) * table_row_height
+                + bottom_margin
+            )
+
+        for row_idx in range(0, num_horses, buttons_per_row):
+
+            row_horses = all_horse_list[
+                row_idx:row_idx + buttons_per_row
+            ]
+
+            row_buttons = []
+
+            for h_btn in row_horses:
+
+                g_idx = all_horse_list.index(h_btn)
+                sub_df = horse_sub_dfs[g_idx]
+
+                count = len(sub_df)
+
+                plus_count = 0
+
+                if (
+                    not sub_df.empty
+                    and '上一次排名' in sub_df.columns
+                ):
+                    plus_count = (
+                        sub_df['上一次排名']
+                        .astype(str)
+                        .str.contains(r'\+')
+                        .sum()
+                    )
+
+                # 只有所選馬匹的 Trace 顯示
+                vis = [
+                    j == g_idx
+                    for j in range(num_horses)
+                ]
+
+                # 按每匹馬實際行數計算高度
+                dynamic_height = get_dynamic_height(count)
+
+                row_buttons.append({
+                    "label": f"{h_btn:02d}號 ({count}) (+{plus_count})",
+                    "method": "update",
+                    "args": [
+                        {"visible": vis},
+                        {
+                            "height": dynamic_height,
+                            "title": {
+                                "text": f"<b>正在檢視：{h_btn} 號馬過熱組合</b>",
+                                "font": {
+                                    "size": 19,
+                                    "color": "white"
+                                }
+                            }
+                        }
+                    ]
+                })
+
+            current_row_from_bottom = (
+                menu_rows - 1 - (row_idx // buttons_per_row)
+            )
+
+            menu_list.append({
+                "type": "buttons",
+                "direction": "right",
+                "x": 0,
+                "xanchor": "left",
+                "yanchor": "bottom",
+                "y": 1.01 + (current_row_from_bottom * 0.09),
+                "buttons": row_buttons,
+                "showactive": False,
+                "bgcolor": "#333333",
+                "font": {
+                    "color": "white",
+                    "size": 19
+                },
+                "bordercolor": "#777777",
+                "borderwidth": 1,
+                "pad": {
+                    "r": 10,
+                    "t": 5,
+                    "b": 5
+                }
+            })
+
+        # -----------------------------------------------------
+        # 初始高度：只按第一匹馬的組合數量計算
+        # -----------------------------------------------------
+        initial_count = len(horse_sub_dfs[0])
+
+        fig.update_layout(
+            dragmode=False,
+            updatemenus=menu_list,
+            margin=dict(
+                t=top_margin,
+                b=10,
+                l=0,
+                r=0
+            ),
+            height=get_dynamic_height(initial_count),
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(
+                color="white",
+                family="Arial",
+                size=18
             )
         )
-    
-    # 動態高度
-    max_rows = max(
-        [
-            len(
-                ov_df[
-                    ov_df["組合"].apply(
-                        lambda x: combination_contains_horse(x, h)
-                    )
-                ]
-            )
-            for h in all_horse_list
-        ] or [1]
-    )
-    
-    horse_fig.update_layout(
-        title=dict(
-            text=f"<b>{all_horse_list[0]:02d} 號馬過熱組合</b>",
-            font=dict(color="white", size=17)
-        ),
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="right",
-                buttons=horse_buttons,
-                showactive=True,
-                x=0,
-                xanchor="left",
-                y=1.18,
-                yanchor="top",
-                bgcolor="#333333",
-                bordercolor="#666666",
-                font=dict(color="white", size=12),
-                pad=dict(r=3, t=3),
-                active=0
-            )
-        ],
-        margin=dict(t=110, b=10, l=5, r=5),
-        height=110 + max_rows * 40,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="white")
-    )
-    
-    st.plotly_chart(
-        horse_fig,
-        width="stretch",
-        key=f"henery_horse_{race_no_local}_{time_now.strftime('%H%M%S')}",
-        config={"displayModeBar": False}
-    )
+
+        latest_stamp = (
+            pd.to_datetime(win_df.index[-1]).strftime('%H%M%S')
+        )
+
+        st.plotly_chart(
+            fig,
+            width='stretch',
+            key=f"henery_horse_{race_no}_{latest_stamp}",
+            config={'displayModeBar': False}
+        )
 
     # =========================================================
-    # 10. 第三張圖：記錄每匹馬的過熱組合數量
+    # 10. 歷史過熱組合 Heatmap
     # =========================================================
     st.markdown("---")
-    st.subheader("🔥 ③ 全場馬匹過熱組合數量 Heatmap")
-    time_str_show()
-    # 初始化歷史資料
-    if "horse_count_history" not in st.session_state:
+    st.subheader("🔥 歷史熱度掃描 (Heatmap)")
+
+    st.markdown(
+        f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`"
+    )
+
+    # 使用 WIN 歷史時間作為 Heatmap 的時間軸
+    sync_time = pd.to_datetime(
+        win_df.index[-1],
+        errors='coerce'
+    )
+
+    if pd.isna(sync_time):
+        sync_time = pd.Timestamp.now(tz=HK_TZ)
+
+    # ---------------------------------------------------------
+    # 建立每匹馬的當刻過熱組合數量
+    # ---------------------------------------------------------
+    current_horse_counts = {
+        str(h): 0 for h in all_horse_list
+    }
+
+    for h_num in all_horse_list:
+
+        mask = ov_df['組合'].apply(
+            lambda x: h_num in [
+                int(n) for n in re.findall(r'\d+', str(x))
+            ]
+        )
+
+        current_horse_counts[str(h_num)] = int(mask.sum())
+
+    # ---------------------------------------------------------
+    # 儲存歷史資料
+    # ---------------------------------------------------------
+    if 'horse_count_history' not in st.session_state:
         st.session_state.horse_count_history = {}
 
-    if race_no_local not in st.session_state.horse_count_history:
-        st.session_state.horse_count_history[race_no_local] = pd.DataFrame()
+    if race_no not in st.session_state.horse_count_history:
+        st.session_state.horse_count_history[race_no] = pd.DataFrame()
 
-    # 使用 WIN 最後更新時間作為歷史時間軸
-    sync_time = pd.to_datetime(win_df.index[-1])
+    hist_df = st.session_state.horse_count_history[race_no].copy()
 
-    # 計算每匹馬當刻涉及多少個過熱組合
-    current_horse_counts = {}
-
-    for horse_no in all_horse_list:
-
-        count = ov_df["組合"].apply(
-            lambda x: combination_contains_horse(
-                x, horse_no
-            )
-        ).sum()
-
-        current_horse_counts[str(horse_no)] = int(count)
-
-    # 更新歷史 DataFrame
-    hist_df = st.session_state.horse_count_history[
-        race_no_local
-    ].copy()
+    if not hist_df.empty:
+        hist_df.index = pd.to_datetime(
+            hist_df.index,
+            errors='coerce'
+        )
+        hist_df = hist_df[~hist_df.index.isna()]
+        hist_df.columns = hist_df.columns.astype(str)
 
     new_entry = pd.DataFrame(
         [current_horse_counts],
         index=[sync_time]
     )
 
-    if hist_df.empty:
-        hist_df = new_entry
+    # 同一個時間點更新資料，不重複新增
+    plot_data = pd.concat([
+        hist_df,
+        new_entry
+    ])
 
-    else:
-        # 合併所有馬號欄位
-        all_history_horses = sorted(
-            set(hist_df.columns).union(
-                new_entry.columns
-            ),
-            key=lambda x: int(x)
+    plot_data = plot_data[
+        ~plot_data.index.duplicated(keep='last')
+    ].tail(40)
+
+    st.session_state.horse_count_history[race_no] = plot_data
+
+    # ---------------------------------------------------------
+    # 取得賠率資料
+    # ---------------------------------------------------------
+    latest_win = win_df.iloc[-1]
+
+    # 保留原本使用的歷史位置
+    prev_win = (
+        win_df.iloc[-4]
+        if len(win_df) >= 4
+        else win_df.iloc[0]
+    )
+
+    prev_3_win = (
+        win_df.iloc[-10]
+        if len(win_df) >= 10
+        else win_df.iloc[0]
+    )
+
+    # 建立馬號與 DataFrame 欄位的對照
+    win_column_map = {}
+
+    for col in win_df.columns:
+        try:
+            h_num = int(float(str(col).strip()))
+            win_column_map[h_num] = col
+        except (ValueError, TypeError):
+            continue
+
+    def get_horse_odds(row, horse_num):
+        col_key = win_column_map.get(horse_num)
+
+        if col_key is None:
+            return np.nan
+
+        val = pd.to_numeric(
+            row.get(col_key, np.nan),
+            errors='coerce'
         )
 
-        hist_df = hist_df.reindex(
-            columns=all_history_horses,
-            fill_value=0
-        )
+        if pd.notna(val) and np.isfinite(val) and val > 0:
+            return float(val)
 
-        new_entry = new_entry.reindex(
-            columns=all_history_horses,
-            fill_value=0
-        )
+        return np.nan
 
-        # 相同時間戳更新，不重複新增
-        hist_df.loc[sync_time] = new_entry.iloc[0]
+    # ---------------------------------------------------------
+    # Heatmap 排序
+    # 第一排序：過熱組合數量由多至少
+    # 第二排序：現時賠率由低至高
+    # ---------------------------------------------------------
+    if not plot_data.empty:
 
-    # 排序及保留最近 120 個時間點
-    hist_df = hist_df.sort_index().tail(120)
-
-    # 缺少的馬匹數據以 0 計算
-    hist_df = hist_df.fillna(0)
-
-    st.session_state.horse_count_history[
-        race_no_local
-    ] = hist_df
-
-    # =========================================================
-    # 11. 繪製全場 Heatmap
-    # =========================================================
-    if not hist_df.empty:
-
-        # 所有馬匹都顯示，不只顯示過熱數量大於 2 的馬匹
-        heat_horses = sorted(
-            hist_df.columns.tolist(),
-            key=lambda x: int(x)
-        )
-
-        heat_df = hist_df[heat_horses].T
-
-        # 時間標籤
-        time_labels = [
-            pd.Timestamp(t).strftime("%H:%M:%S")
-            for t in heat_df.columns
+        # 只顯示目前過熱組合數量大於 2 的馬匹
+        active_horses = [
+            str(h)
+            for h in plot_data.columns
+            if pd.to_numeric(
+                plot_data[h].iloc[-1],
+                errors='coerce'
+            ) > 2
         ]
 
-        horse_labels = [
-            f"{int(h):02d} 號"
-            for h in heat_df.index
-        ]
+        if active_horses:
 
-        # 顏色範圍
-        max_count = max(
-            1,
-            int(np.nanmax(heat_df.values))
-        )
+            def heatmap_sort_key(h):
 
-        colorscale = [
-            [0.0, "#202020"],
-            [0.15, "#FFFF99"],
-            [0.35, "#FFFF00"],
-            [0.55, "#FF9999"],
-            [0.75, "#FF0000"],
-            [1.0, "#330066"]
-        ]
+                count = pd.to_numeric(
+                    plot_data[h].iloc[-1],
+                    errors='coerce'
+                )
 
-        heat_fig = go.Figure(
-            data=go.Heatmap(
-                z=heat_df.values,
-                x=time_labels,
-                y=horse_labels,
-                colorscale=colorscale,
-                zmin=0,
-                zmax=max_count,
-                zauto=False,
-                ygap=2,
-                xgap=1,
-                colorbar=dict(
-                    title=dict(
-                        text="過熱組合數量",
-                        font=dict(color="white")
+                if pd.isna(count):
+                    count = 0
+
+                horse_num = int(h)
+
+                odds = get_horse_odds(
+                    latest_win,
+                    horse_num
+                )
+
+                if pd.isna(odds):
+                    odds = float('inf')
+
+                return (-count, odds)
+
+            # 按過熱數量排序；相同數量按賠率排序
+            active_horses = sorted(
+                active_horses,
+                key=heatmap_sort_key
+            )
+
+            # -------------------------------------------------
+            # 建立 Z 矩陣
+            # -------------------------------------------------
+            z_df = (
+                plot_data[active_horses]
+                .T
+            )
+
+            # -------------------------------------------------
+            # Y 軸顯示馬號 + 即時賠率 + 之前賠率
+            # -------------------------------------------------
+            y_labels = []
+
+            for h_str in active_horses:
+
+                h_num = int(h_str)
+
+                curr_o = get_horse_odds(
+                    latest_win,
+                    h_num
+                )
+
+                prev_o = get_horse_odds(
+                    prev_win,
+                    h_num
+                )
+
+                prev_3_o = get_horse_odds(
+                    prev_3_win,
+                    h_num
+                )
+
+                curr_text = (
+                    f"{curr_o:.1f}"
+                    if pd.notna(curr_o)
+                    else "-"
+                )
+
+                prev_text = (
+                    f"{prev_o:.1f}"
+                    if pd.notna(prev_o)
+                    else "-"
+                )
+
+                prev_3_text = (
+                    f"{prev_3_o:.1f}"
+                    if pd.notna(prev_3_o)
+                    else "-"
+                )
+
+                label = (
+                    f"<b>{h_num:02d} 號</b><br>"
+                    f"<span>現時 {curr_text}</span><br>"
+                    f"<span style='color:#999999'>"
+                    f"之前 {prev_text} ｜ 更早 {prev_3_text}"
+                    f"</span>"
+                )
+
+                y_labels.append(label)
+
+            # -------------------------------------------------
+            # Heatmap 顏色
+            # -------------------------------------------------
+            colorscale_thresholds = [
+                [0.0, '#FFFFFF'],
+                [0.1, '#FFEEEE'],
+                [0.2, '#FFFF99'],
+                [0.4, '#FFFF00'],
+                [0.6, '#FF9999'],
+                [0.8, '#FF0000'],
+                [1.0, '#330066']
+            ]
+
+            max_count = pd.to_numeric(
+                z_df.stack(),
+                errors='coerce'
+            ).max()
+
+            if pd.isna(max_count):
+                max_count = 10
+
+            fixed_zmax = max(10, int(max_count))
+
+            fig_heat = go.Figure(
+                data=go.Heatmap(
+                    z=z_df.fillna(0).values,
+                    x=z_df.columns,
+                    y=y_labels,
+                    ygap=2.5,
+                    zmin=0,
+                    zmax=fixed_zmax,
+                    colorscale=colorscale_thresholds,
+                    showscale=True,
+                    colorbar=dict(
+                        title=dict(
+                            text="過熱組合數",
+                            font=dict(
+                                color="white",
+                                size=18
+                            )
+                        ),
+                        tickfont=dict(
+                            color="white",
+                            size=17
+                        )
                     ),
-                    tickfont=dict(color="white")
-                ),
-                hovertemplate=(
-                    "馬匹：%{y}<br>"
-                    "時間：%{x}<br>"
-                    "過熱組合數量：%{z}"
-                    "<extra></extra>"
+                    hovertemplate=(
+                        "時間: %{x|%H:%M:%S}<br>"
+                        "%{y}<br>"
+                        "過熱組合數: %{z}"
+                        "<extra></extra>"
+                    )
                 )
             )
-        )
 
-        # 控制 X 軸時間標籤數量
-        total_times = len(time_labels)
-
-        tick_step = max(
-            1,
-            total_times // 10
-        )
-
-        tick_indices = list(
-            range(0, total_times, tick_step)
-        )
-
-        if total_times > 0 and (
-            total_times - 1
-        ) not in tick_indices:
-            tick_indices.append(total_times - 1)
-
-        heat_fig.update_layout(
-            height=max(
-                250,
-                120 + len(heat_horses) * 38
-            ),
-            margin=dict(
-                t=20,
-                b=60,
-                l=65,
-                r=25
-            ),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(
-                color="white"
-            ),
-            dragmode=False,
-            xaxis=dict(
-                title="時間",
-                tickmode="array",
-                tickvals=[
-                    time_labels[i]
-                    for i in tick_indices
-                ],
-                tickangle=-35,
-                showgrid=False,
-                fixedrange=True
-            ),
-            yaxis=dict(
-                title="馬號",
-                showgrid=False,
-                autorange="reversed",
-                fixedrange=True,
-                tickfont=dict(size=13)
+            # -------------------------------------------------
+            # Heatmap 自動高度
+            # 按實際顯示的馬匹數量調整
+            # -------------------------------------------------
+            dynamic_height = max(
+                300,
+                140 + len(active_horses) * 65
             )
-        )
 
-        st.plotly_chart(
-            heat_fig,
-            width="stretch",
-            key=f"henery_heatmap_{race_no_local}_{time_now.strftime('%H%M%S')}",
-            config={"displayModeBar": False}
-        )
+            fig_heat.update_layout(
+                height=dynamic_height,
+                margin=dict(
+                    t=20,
+                    b=20,
+                    l=230,
+                    r=40
+                ),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                dragmode=False,
+                font=dict(
+                    color="white",
+                    size=18
+                ),
+                xaxis=dict(
+                    showticklabels=False,
+                    showgrid=False,
+                    zeroline=False,
+                    fixedrange=True
+                ),
+                yaxis=dict(
+                    showgrid=False,
+                    title=dict(
+                        text="馬號 / 賠率",
+                        font=dict(size=19)
+                    ),
+                    fixedrange=True,
+                    tickfont=dict(size=18),
+                    autorange='reversed'
+                )
+            )
 
-        st.caption(
-            "顏色代表該時間點每匹馬涉及的過熱組合數量；"
-            "數量越高，顏色越深。"
-        )
+            st.plotly_chart(
+                fig_heat,
+                width='stretch',
+                config={'displayModeBar': False}
+            )
 
-    else:
-        st.info("暫時沒有過熱組合歷史紀錄")
+        else:
+            st.info("目前沒有足夠數量的過熱組合可顯示 Heatmap。")
 
     return full_df
     
