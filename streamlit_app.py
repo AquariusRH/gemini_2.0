@@ -2271,11 +2271,19 @@ def print_henery_model(gamma=1.18):
     if not ov_df.empty:
 
         # 保留原本全場最多顯示 25 個過熱組合
+        overheated_df = ov_df.copy()
+        overheated_df['_排名排序'] = pd.to_numeric(
+            overheated_df['排名'], errors='coerce'
+        )
         overheated_df = (
-            ov_df.sort_values(
-                ['Value', '實時Q'],
-                ascending=[True, True]
-            ).head(25)
+            overheated_df
+            .sort_values(
+                ['_排名排序', '實時Q'],
+                ascending=[True, True],
+                na_position='last'
+            )
+            .head(25)
+            .drop(columns='_排名排序')
         )
 
         st.markdown(
