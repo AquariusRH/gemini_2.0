@@ -3682,39 +3682,16 @@ def print_money_table(race_no, title="💰 Money Flow 專用表"):
         )
     )
 
-    # 8. 顯示標題及說明
+    # --- 顯示標題 ---
     st.markdown(f"### {title}")
-    st.caption(
-        "賠率順序：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前。  \n"
-        "每個箭咀與前一個時間點比較：↓ 下跌，↑ 上升，→ 不變。  \n"
-        "未有歷史紀錄會顯示 --。"
-    )
-
-    # 9. CSS：不限制高度、不設內部捲動
-    table_css = """
-    <style>
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-    }
-    th, td {
-        padding: 8px 5px !important;
-        vertical-align: middle !important;
-    }
-    th {
-        white-space: normal !important;
-        font-size: 14px !important;
-    }
-    td {
-        white-space: nowrap;
-    }
-    </style>
-    """
-
-    # 10. HTML 顯示完整表格
-    table_html = styled_money.to_html()
-    st.html(table_css + table_html)
+    
+    #st.caption(
+    #    "賠率順序：當刻 - 1分鐘前 - 2分鐘前 - 3分鐘前 - 4分鐘前\n"
+    #    "箭咀比較相鄰賠率：↓ 下跌，↑ 上升，→ 不變；-- 代表沒有歷史資料。"
+    #)
+    
+    # --- 使用 st.table 顯示全部馬匹 ---
+    st.table(display_money.style.hide(axis='index'))
 
 GRAPHQL_URL = "https://info.cld.hkjc.com/graphql/base/"
 
