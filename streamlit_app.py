@@ -742,7 +742,51 @@ def change_overall(time_now):
     st.session_state.diff_dict['overall'] = pd.concat(
         [st.session_state.diff_dict['overall'], total_investment_df]
     )
+    
+def time_str_show():
+    # --- 時間處理與開跑倒數 ---
+    HK_TZ = timezone(timedelta(hours=8))
+    now = datetime.now(HK_TZ)
+    post_time_dict = st.session_state.get("post_time_dict", {})
+    post_time_raw = post_time_dict.get(
+        race_no,
+        post_time_dict.get(str(race_no))
+    )
 
+    if post_time_raw is not None and not pd.isna(post_time_raw):
+        try:
+            post_time = pd.Timestamp(post_time_raw)
+            if post_time.tzinfo is None:
+                post_time = post_time.tz_localize(HK_TZ)
+            else:
+                post_time = post_time.tz_convert(HK_TZ)
+
+            seconds_left = (post_time - pd.Timestamp(now)).total_seconds()
+            time_str = (
+                "🏁 已開跑"
+                if seconds_left <= 0
+                else f" {int(seconds_left // 60)} 分"
+            )
+        except (TypeError, ValueError):
+            time_str = "未載入"
+    else:
+        time_str = "未載入"
+
+    # --- 最後同步時間 ---
+    last_update = st.session_state.get("last_update")
+    if last_update is not None:
+        try:
+            last_update_time = pd.Timestamp(last_update)
+            if last_update_time.tzinfo is not None:
+                last_update_time = last_update_time.tz_convert(HK_TZ)
+            last_upd = last_update_time.strftime("%H:%M:%S")
+        except (TypeError, ValueError):
+            last_upd = "N/A"
+    else:
+        last_upd = "N/A"
+
+    st.markdown(f"#### {time_str} ｜ 📟 數據最後同步: `{last_upd}`")
+        
 def request_tce_investment(
     date: str,
     venue_code: str,
@@ -1155,7 +1199,7 @@ def analyze_tce_investment(tce_df, race_no):
             time_str = (
                 "🏁 已開跑"
                 if seconds_left <= 0
-                else f"⏳ 離開跑 {int(seconds_left // 60)} 分"
+                else f" {int(seconds_left // 60)} 分"
             )
         except (TypeError, ValueError):
             time_str = "未載入"
@@ -2285,7 +2329,7 @@ def print_henery_model(gamma=1.18):
     # =========================================================
     st.markdown("---")
     st.subheader("🐎 ② 個別馬匹過熱組合")
-    
+    time_str_show()
     horse_fig = go.Figure()
     horse_buttons = []
     
@@ -2444,7 +2488,7 @@ def print_henery_model(gamma=1.18):
     st.plotly_chart(
         horse_fig,
         width="stretch",
-        key=f"henery_horse_{race_no_local}",
+        key=f"henery_horse_{race_no_local}_{time_now.strftime('%H%M%S')}_{latest_ts}",
         config={"displayModeBar": False}
     )
 
@@ -2453,7 +2497,7 @@ def print_henery_model(gamma=1.18):
     # =========================================================
     st.markdown("---")
     st.subheader("🔥 ③ 全場馬匹過熱組合數量 Heatmap")
-
+    time_str_show()
     # 初始化歷史資料
     if "horse_count_history" not in st.session_state:
         st.session_state.horse_count_history = {}
@@ -2645,7 +2689,7 @@ def print_henery_model(gamma=1.18):
         st.plotly_chart(
             heat_fig,
             width="stretch",
-            key=f"henery_heatmap_{race_no_local}",
+            key=f"henery_heatmap_{race_no_local}_{time_now.strftime('%H%M%S')}_{latest_ts}",
             config={"displayModeBar": False}
         )
 
