@@ -2488,7 +2488,7 @@ def print_henery_model(gamma=1.18):
     st.plotly_chart(
         horse_fig,
         width="stretch",
-        key=f"henery_horse_{race_no_local}_{time_now.strftime('%H%M%S')}_{latest_ts}",
+        key=f"henery_horse_{race_no_local}_{time_now.strftime('%H%M%S')}",
         config={"displayModeBar": False}
     )
 
@@ -2689,7 +2689,7 @@ def print_henery_model(gamma=1.18):
         st.plotly_chart(
             heat_fig,
             width="stretch",
-            key=f"henery_heatmap_{race_no_local}_{time_now.strftime('%H%M%S')}_{latest_ts}",
+            key=f"henery_heatmap_{race_no_local}_{time_now.strftime('%H%M%S')}",
             config={"displayModeBar": False}
         )
 
